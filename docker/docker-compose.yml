@@ -16,21 +16,21 @@ services:
       - POSTGRES_USER=ricou
       - POSTGRES_PASSWORD=monmdp
     volumes:
-      - /home/simounix/epita/ing2/bigdata/bourse/timescaledb:/var/lib/postgresql/data/timescaledb
+      - /home/koweez/ing2/pybd/bigdata-bourse/timescaledb:/var/lib/postgresql/data/timescaledb
     healthcheck:
-        test: ["CMD-SHELL", "pg_isready bourse"]
-        interval: 6s
-        timeout: 3s
-        retries: 5
+      test: [ "CMD-SHELL", "pg_isready bourse" ]
+      interval: 6s
+      timeout: 3s
+      retries: 5
 
   analyzer:
     image: my_analyzer
     depends_on:
-        - db
+      - db
     networks:
       - boursenet
     volumes:
-      - /home/simounix/epita/ing2/bigdata/bourse/data:/home/bourse/data/
+      - /home/koweez/ing2/pybd/bigdata-bourse/boursorama:/home/bourse/data/
 
   dashboard:
     image: my_dashboard
