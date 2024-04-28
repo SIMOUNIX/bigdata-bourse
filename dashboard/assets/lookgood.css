@@ -1,0 +1,45 @@
+/* assets/style.css */
+
+/* Style for vertical navbar */
+.vertical-navbar {
+    display: flex;
+    flex-direction: column;
+    width: 200px;
+    height: 100vh;
+    background-color: #f8f9fa;
+    padding: 20px;
+}
+
+/* Style for navbar buttons */
+.navbar .btn {
+    margin-bottom: 10px;
+}
+
+/* Style for navbar button text */
+.btn-width {
+    width: 100%;
+}
+
+/* Style for container holding textarea */
+.container {
+    margin-left: 20px;
+    margin-top: 20px;
+}
+
+/* Style for textarea */
+textarea {
+    width: calc(100% - 40px); /* Adjust width as needed */
+    height: 200px;
+    resize: none;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    outline: none;
+}
+
+/* Style for dashboard content */
+#dashboard-content {
+    margin-left: 20px;
+    margin-top: 20px;
+}
