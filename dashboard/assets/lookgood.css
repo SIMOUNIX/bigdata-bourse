@@ -1,18 +1,26 @@
 /* assets/style.css */
 
-/* Style for vertical navbar */
-.vertical-navbar {
-    display: flex;
-    flex-direction: column;
-    width: 200px;
-    height: 100vh;
-    background-color: #f8f9fa;
-    padding: 20px;
+:root {
+    --text: #080202;
+    --background: #fdf7f7;
+    --primary: #d03e3b;
+    --secondary: #e4bd8d;
+    --accent: #dbc96a;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
 }
 
 /* Style for navbar buttons */
 .navbar .btn {
     margin-bottom: 10px;
+}
+
+.active {
+    background-color: var(--secondary);
 }
 
 /* Style for navbar button text */
@@ -21,25 +29,30 @@
 }
 
 /* Style for container holding textarea */
-.container {
-    margin-left: 20px;
-    margin-top: 20px;
+.layout-container {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100vh;
+    margin: 0;
 }
 
-/* Style for textarea */
-textarea {
-    width: calc(100% - 40px); /* Adjust width as needed */
-    height: 200px;
-    resize: none;
+.vertical-navbar {
+    width: 200px; /* Adjust width as needed */
+    /* min-height: 100%; Ensure the navbar is at least as tall as the viewport */
+    background-color: var(--background);
     padding: 10px;
-    font-size: 14px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    outline: none;
+    margin: 10px;
+    overflow-y: auto; /* Add vertical scrollbar if content exceeds viewport height */
+
+    border-radius: 10px;
 }
 
-/* Style for dashboard content */
-#dashboard-content {
-    margin-left: 20px;
-    margin-top: 20px;
+.main-content {
+    flex: 1; /* Take up remaining space */
+    background-color: var(--background);
+    padding: 20px;
+
+    margin: 10px 10px 10px 0;
+    border-radius: 10px;
 }
