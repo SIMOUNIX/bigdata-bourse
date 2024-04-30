@@ -61,3 +61,16 @@ def build_every_year_total_sales_content():
 
     return year_selector, selected_year_text, df
 
+def generate_data_candlestick(num_days):
+    dates = pd.date_range(start='2024-01-01', periods=num_days)
+    prices = np.cumsum(np.random.randn(num_days))
+
+    data = {
+        'Date': dates,
+        'Open': prices,
+        'High': prices + np.random.rand(num_days),
+        'Low': prices - np.random.rand(num_days),
+        'Close': prices + np.random.randn(num_days)
+    }
+    df = pd.DataFrame(data)
+    return df

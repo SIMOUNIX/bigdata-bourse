@@ -5,7 +5,7 @@ import pandas as pd
 import sqlalchemy
 import plotly.graph_objects as go
 
-from utils import build_every_year_total_sales_content, generate_random_data
+from utils import build_every_year_total_sales_content, generate_random_data, generate_data_candlestick
 
 external_stylesheets = [
     'https://codepen.io/chriddyp/pen/bWLwgP.css',
@@ -58,7 +58,7 @@ def update_page_content(btn_home, btn_share_price, btn_bollinger_bands, btn_raw_
         content = build_every_year_total_sales_content()
         active_button_id = id_home
     elif button_id == 'btn-share-price':
-        content = "Share Price Content"
+        content = build_candlestick_content()
         active_button_id = id_share_price
     elif button_id == 'btn-bollinger-bands':
         content = build_bollinger_content()
@@ -153,6 +153,27 @@ def update_bollinger_graph(selected_market):
         elif row['Close'] < row['LB']:
             fig.add_annotation(x=row['Date'], y=row['Close'], text="Below Lower Band", showarrow=True, arrowhead=1, arrowcolor='green', ax=0, ay=40)
 
+    return fig
+
+def build_candlestick_content():
+    df = generate_data_candlestick(100)
+    return dcc.Graph(figure=go.Figure(data=[go.Candlestick(x=df['Date'],
+                                                            open=df['Open'],
+                                                            high=df['High'],
+                                                            low=df['Low'],
+                                                            close=df['Close'])]))
+
+@app.callback(
+    Output('candlestick-graph', 'figure'),
+    [Input('candlestick-selector', 'value')]
+)
+def update_candlestick_graph(selected_market):
+    df = generate_data_candlestick(100)
+    fig = go.Figure(data=[go.Candlestick(x=df['Date'],
+                                         open=df['Open'],
+                                         high=df['High'],
+                                         low=df['Low'],
+                                         close=df['Close'])])
     return fig
 
 if __name__ == '__main__':
