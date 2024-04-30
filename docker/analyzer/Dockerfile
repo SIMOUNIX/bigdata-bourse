@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:20.04
 MAINTAINER Olivier Ricou <olivier@ricou.eu.org>
 
 # If you have a web spider getting data, then you can run 
@@ -8,14 +8,14 @@ ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update                              \
     && apt-get install -y --no-install-recommends   \
-       python3 git make python3-pip python3-setuptools cron bzip2 tzdata
+    python3 git make python3-pip python3-setuptools cron bzip2 tzdata
 
 RUN pip3 install pip --upgrade
 COPY requirements.txt /tmp/
 RUN pip install -r /tmp/requirements.txt
 
 RUN apt-get update && apt-get install -y locales && rm -rf /var/lib/apt/lists/* \
-	&& localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
 
 ENV LANG en_US.
 ENV PYTHONPATH "/home/bourse/.local/lib/python3/site-packages/"
