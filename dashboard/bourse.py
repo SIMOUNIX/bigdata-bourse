@@ -3,11 +3,16 @@ from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import pandas as pd
 import sqlalchemy
+import plotly.graph_objects as go
+from plotly.offline import iplot
+from plotly.subplots import make_subplots
+
+from utils import generate_random_data, build_bollinger_content
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', 'docker/dashboard/dashboard/assets/lookgood.css']
 
-# DATABASE_URI = 'timescaledb://ricou:monmdp@db:5432/bourse'    # inside docker
-DATABASE_URI = 'timescaledb://ricou:monmdp@localhost:5432/bourse'  # outisde docker
+DATABASE_URI = 'timescaledb://ricou:monmdp@db:5432/bourse'    # inside docker
+# DATABASE_URI = 'timescaledb://ricou:monmdp@localhost:5432/bourse'  # outisde docker
 engine = sqlalchemy.create_engine(DATABASE_URI)
 
 app = dash.Dash(__name__,  title="Bourse", suppress_callback_exceptions=True, external_stylesheets=external_stylesheets)
@@ -17,7 +22,7 @@ server = app.server
 app.layout = html.Div([
     html.Div([
         html.Div([
-            html.Button('Dashboard', id='btn-dashboard', n_clicks=0, className='btn btn-width'),
+            html.Button('Overview', id='btn-dashboard', n_clicks=0, className='btn btn-width'),
             html.Button('Share Price', id='btn-share-price', n_clicks=0, className='btn btn-width'),
             html.Button('Bollinger Bands', id='btn-bollinger-bands', n_clicks=0, className='btn btn-width'),
             html.Button('Raw Data', id='btn-raw-data', n_clicks=0, className='btn btn-width')
@@ -55,7 +60,7 @@ def update_page_content(btn_home, btn_share_price, btn_bollinger_bands, btn_raw_
         content = "Share Price Content"
         active_button_id = id_share_price
     elif button_id == 'btn-bollinger-bands':
-        content = "Bollinger Bands Content"
+        content = build_bollinger_content()
         active_button_id = id_bollinger_bands
     elif button_id == 'btn-raw-data':
         content = "Raw Data Content"
@@ -66,7 +71,7 @@ def update_page_content(btn_home, btn_share_price, btn_bollinger_bands, btn_raw_
 
     # Update class names of buttons
     menu_buttons = [
-        html.Button('Home', id='btn-dashboard', n_clicks=0, className='btn btn-width'),
+        html.Button('Overview', id='btn-dashboard', n_clicks=0, className='btn btn-width'),
         html.Button('Share Price', id='btn-share-price', n_clicks=0, className='btn btn-width'),
         html.Button('Bollinger Bands', id='btn-bollinger-bands', n_clicks=0, className='btn btn-width'),
         html.Button('Raw Data', id='btn-raw-data', n_clicks=0, className='btn btn-width')

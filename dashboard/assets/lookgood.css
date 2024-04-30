@@ -1,15 +1,40 @@
 /* assets/style.css */
 
+@import url('https://fonts.googleapis.com/css?family=Poppins:700|Poppins:400');
+
+body {
+  font-family: 'Poppins';
+  font-weight: 400;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Poppins';
+  font-weight: 700;
+}
+
+html {font-size: 100%;} /* 16px */
+
+h1 {font-size: 4.210rem; /* 67.36px */}
+
+h2 {font-size: 3.158rem; /* 50.56px */}
+
+h3 {font-size: 2.369rem; /* 37.92px */}
+
+h4 {font-size: 1.777rem; /* 28.48px */}
+
+h5 {font-size: 1.333rem; /* 21.28px */}
+
+small {font-size: 0.750rem; /* 12px */}
+
 :root {
-    --text: #080202;
-    --background: #fdf7f7;
-    --primary: #d03e3b;
-    --secondary: #e4bd8d;
-    --accent: #dbc96a;
+    --text: #0f1513;
+    --background: #f9fbfa;
+    --primary: #6da698;
+    --secondary: #9ec9be;
+    --accent: #87c1b2;
 }
 
 body {
-    font-family: 'Roboto', sans-serif;
     margin: 0;
     padding: 0;
 }
@@ -20,9 +45,22 @@ body {
 }
 
 .active {
-    background-color: var(--secondary);
+    background-color: var(--secondary)!important;
+    opacity: 100%!important;
 }
 
+.btn:hover {
+    opacity: 100%;
+}
+
+.btn {
+    text-align: left;
+    background-color: var(--background);
+    color: var(--text);
+    opacity: 60%;
+    text-transform: none;
+    border: none;
+}
 /* Style for navbar button text */
 .btn-width {
     width: 100%;
