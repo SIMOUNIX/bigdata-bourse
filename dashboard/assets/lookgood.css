@@ -1,0 +1,96 @@
+/* assets/style.css */
+
+@import url('https://fonts.googleapis.com/css?family=Poppins:700|Poppins:400');
+
+body {
+  font-family: 'Poppins';
+  font-weight: 400;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Poppins';
+  font-weight: 700;
+}
+
+html {font-size: 100%;} /* 16px */
+
+h1 {font-size: 4.210rem; /* 67.36px */}
+
+h2 {font-size: 3.158rem; /* 50.56px */}
+
+h3 {font-size: 2.369rem; /* 37.92px */}
+
+h4 {font-size: 1.777rem; /* 28.48px */}
+
+h5 {font-size: 1.333rem; /* 21.28px */}
+
+small {font-size: 0.750rem; /* 12px */}
+
+:root {
+    --text: #0f1513;
+    --background: #f9fbfa;
+    --primary: #6da698;
+    --secondary: #9ec9be;
+    --accent: #87c1b2;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/* Style for navbar buttons */
+.navbar .btn {
+    margin-bottom: 10px;
+}
+
+.active {
+    background-color: var(--secondary)!important;
+    opacity: 100%!important;
+}
+
+.btn:hover {
+    opacity: 100%;
+}
+
+.btn {
+    text-align: left;
+    background-color: var(--background);
+    color: var(--text);
+    opacity: 60%;
+    text-transform: none;
+    border: none;
+}
+/* Style for navbar button text */
+.btn-width {
+    width: 100%;
+}
+
+/* Style for container holding textarea */
+.layout-container {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+}
+
+.vertical-navbar {
+    width: 200px; /* Adjust width as needed */
+    /* min-height: 100%; Ensure the navbar is at least as tall as the viewport */
+    background-color: var(--background);
+    padding: 10px;
+    margin: 10px;
+    overflow-y: auto; /* Add vertical scrollbar if content exceeds viewport height */
+
+    border-radius: 10px;
+}
+
+.main-content {
+    flex: 1; /* Take up remaining space */
+    background-color: var(--background);
+    padding: 20px;
+
+    margin: 10px 10px 10px 0;
+    border-radius: 10px;
+}
