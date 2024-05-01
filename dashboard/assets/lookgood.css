@@ -88,9 +88,23 @@ body {
 
 .main-content {
     flex: 1; /* Take up remaining space */
+    /* background-color: var(--background); */
+    /* padding: 20px; */
+
+    /* margin: 10px 10px 10px 0; */
+    /* border-radius: 10px; */
+}
+
+.main-content-children {
     background-color: var(--background);
     padding: 20px;
-
-    margin: 10px 10px 10px 0;
+    margin: 10px;
     border-radius: 10px;
 }
+
+.selector-div {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+}
+
