@@ -4,6 +4,7 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 import sqlalchemy
 import plotly.graph_objects as go
+from datetime import date
 
 from utils import build_every_year_total_sales_content, generate_random_data, generate_data_candlestick, generate_menu_buttons, build_bollinger_content, build_candlestick_content
 
@@ -85,9 +86,11 @@ def get_page_content(button_id, id_home, id_share_price, id_bollinger_bands, id_
 
 @app.callback(
     Output('bollinger-graph', 'figure'),
-    [Input('market-selector', 'value')]
+    [Input('market-selector', 'value'),
+     Input('date-picker', 'start_date'),
+     Input('date-picker', 'end_date')]
 )
-def update_bollinger_graph(selected_market):
+def update_bollinger_graph(selected_market, start_date, end_date):
     # Generate random data for multiple markets
     df = generate_random_data(100, volatility=0.5, trend=0.1, noise_level=0.1)
     df1 = generate_random_data(100, volatility=0.5, trend=0.3, noise_level=0.2)
@@ -103,6 +106,9 @@ def update_bollinger_graph(selected_market):
 
     # Filter data based on selected market
     selected_market_data = combined_df[combined_df['Market'] == selected_market]
+
+    # Filter data based on selected date range
+    selected_market_data = selected_market_data[(selected_market_data['Date'] >= start_date) & (selected_market_data['Date'] <= end_date)]
 
     fig = go.Figure()
 
@@ -134,23 +140,32 @@ def update_bollinger_graph(selected_market):
 
 @app.callback(
     Output('candlestick-graph', 'figure'),
-    [Input('candlestick-selector', 'value')]
+    [Input('candlestick-selector', 'value'),
+     Input('date-picker', 'start_date'),
+     Input('date-picker', 'end_date')]
 )
-def update_candlestick_graph(selected_markets):
+def update_candlestick_graph(selected_markets, start_date, end_date):
     if not selected_markets:
         return {}
+
+    print(selected_markets)
+    print("Start date:", start_date)
+    print("End date:", end_date)
+          
 
     dfs = generate_data_for_selected_markets(selected_markets)
 
     fig = go.Figure()
     for df, color in dfs:
+        # Filter data based on selected date range
+        filtered_df = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)]
         decreasing_color = lighten_color(color)
-        fig.add_trace(go.Candlestick(x=df['Date'],
-                                      open=df['Open'],
-                                      high=df['High'],
-                                      low=df['Low'],
-                                      close=df['Close'],
-                                      name=df['Market'].iloc[0],
+        fig.add_trace(go.Candlestick(x=filtered_df['Date'],
+                                      open=filtered_df['Open'],
+                                      high=filtered_df['High'],
+                                      low=filtered_df['Low'],
+                                      close=filtered_df['Close'],
+                                      name=filtered_df['Market'].iloc[0],
                                       increasing_line_color=color,
                                       decreasing_line_color=decreasing_color))
         

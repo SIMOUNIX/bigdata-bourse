@@ -5,6 +5,11 @@ import numpy as np
 
 from dash import dcc, html
 import plotly.graph_objects as go
+import sqlalchemy
+
+# DATABASE_URI = 'timescaledb://ricou:monmdp@db:5432/bourse'    # inside docker
+DATABASE_URI = 'timescaledb://ricou:monmdp@localhost:5432/bourse'  # outside docker
+engine = sqlalchemy.create_engine(DATABASE_URI)
 
 np.random.seed(0)
 num_days = 100
@@ -33,6 +38,11 @@ def generate_random_data(num_days, volatility, trend, noise_level):
         'LB': lower_band
     }
     df = pd.DataFrame(data)
+    return df
+
+def get_data_bollinger_bands(market):
+    query = f"SELECT * FROM daystocks WHERE cid = '{market}'"
+    df = pd.read_sql(query, engine)
     return df
 
 def generate_every_year_total_sales():
@@ -109,7 +119,14 @@ def build_bollinger_content():
         value=combined_df['Market'].iloc[0]
     )
 
-    return html.Div([market_selector, dcc.Graph(id='bollinger-graph')])
+    date_picker = dcc.DatePickerRange(
+        id='date-picker',
+        start_date=combined_df['Date'].iloc[0],
+        end_date=combined_df['Date'].iloc[-1],
+        minimum_nights=20 # Minimum number of nights between start and end date, 20 because we need information for the Bollinger Bands
+    )
+
+    return html.Div([market_selector, date_picker, dcc.Graph(id='bollinger-graph')])
 
 def build_candlestick_content():
     # Generate random data for multiple markets
@@ -132,4 +149,10 @@ def build_candlestick_content():
         value=[]
     )
 
-    return html.Div([market_checkboxes, dcc.Graph(id='candlestick-graph')])
+    date_picker = dcc.DatePickerRange(
+        id='date-picker',
+        start_date=combined_df['Date'].iloc[0],
+        end_date=combined_df['Date'].iloc[-1]
+    )
+
+    return html.Div([dcc.Graph(id='candlestick-graph'), market_checkboxes, date_picker])
