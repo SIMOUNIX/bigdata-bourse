@@ -156,25 +156,80 @@ def update_bollinger_graph(selected_market):
     return fig
 
 def build_candlestick_content():
+    # generate random data for multiple markets
     df = generate_data_candlestick(100)
-    return dcc.Graph(figure=go.Figure(data=[go.Candlestick(x=df['Date'],
-                                                            open=df['Open'],
-                                                            high=df['High'],
-                                                            low=df['Low'],
-                                                            close=df['Close'])]))
+    df1 = generate_data_candlestick(100)
+    df2 = generate_data_candlestick(100)
+
+    # associate name to each market
+    df['Market'] = 'Market 1'
+    df1['Market'] = 'Market 2'
+    df2['Market'] = 'Market 3'
+
+    # Combine dataframes
+    combined_df = pd.concat([df, df1, df2])
+
+    # Dropdown to select markets
+    market_checkboxes = dcc.Checklist(
+        id='candlestick-selector',
+        options=[{'label': market, 'value': market} for market in combined_df['Market'].unique()],
+        value=[]
+    )
+
+    return html.Div([market_checkboxes, dcc.Graph(id='candlestick-graph')])
 
 @app.callback(
     Output('candlestick-graph', 'figure'),
     [Input('candlestick-selector', 'value')]
 )
-def update_candlestick_graph(selected_market):
-    df = generate_data_candlestick(100)
-    fig = go.Figure(data=[go.Candlestick(x=df['Date'],
-                                         open=df['Open'],
-                                         high=df['High'],
-                                         low=df['Low'],
-                                         close=df['Close'])])
+def update_candlestick_graph(selected_markets):
+    if not selected_markets:
+        return {}
+
+    dfs = []
+    colors = {'Market 1': '#636EFA', 'Market 2': '#EF553B', 'Market 3': '#00CC96'}
+
+    for market in selected_markets:
+        if market == 'Market 1':
+            df = generate_data_candlestick(100)
+            df['Market'] = 'Market 1'
+        elif market == 'Market 2':
+            df = generate_data_candlestick(100)
+            df['Market'] = 'Market 2'
+        elif market == 'Market 3':
+            df = generate_data_candlestick(100)
+            df['Market'] = 'Market 3'
+        dfs.append((df, colors[market]))  # Append tuple of dataframe and corresponding color
+
+    fig = go.Figure()
+    for df, color in dfs:
+        # Adjust color for decreasing candles (lighten the original color)
+        decreasing_color = lighten_color(color)
+        fig.add_trace(go.Candlestick(x=df['Date'],
+                                      open=df['Open'],
+                                      high=df['High'],
+                                      low=df['Low'],
+                                      close=df['Close'],
+                                      name=df['Market'].iloc[0],
+                                      increasing_line_color=color,  # Set color for increasing candles
+                                      decreasing_line_color=decreasing_color))  # Set color for decreasing candles
+        
     return fig
+
+def lighten_color(color, factor=0.5):
+    """Lighten the given color."""
+    # Convert HEX to RGB
+    color = color.lstrip('#')
+    rgb = tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
+    
+    # Lighten each RGB component
+    lightened_rgb = tuple(int((255 - c) * factor + c) for c in rgb)
+    
+    # Convert RGB to HEX
+    lightened_color = '#{:02x}{:02x}{:02x}'.format(*lightened_rgb)
+    
+    return lightened_color
+
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8050)
