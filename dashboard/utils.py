@@ -74,3 +74,62 @@ def generate_data_candlestick(num_days):
     }
     df = pd.DataFrame(data)
     return df
+
+def generate_menu_buttons(active_button_id):
+    menu_buttons = [
+        html.Button('Overview', id='btn-dashboard', n_clicks=0, className='btn btn-width'),
+        html.Button('Share Price', id='btn-share-price', n_clicks=0, className='btn btn-width'),
+        html.Button('Bollinger Bands', id='btn-bollinger-bands', n_clicks=0, className='btn btn-width'),
+        html.Button('Raw Data', id='btn-raw-data', n_clicks=0, className='btn btn-width')
+    ]
+    for button in menu_buttons:
+        if button.id == active_button_id:
+            button.className += ' active'
+
+    return menu_buttons
+
+def build_bollinger_content():
+    # Generate random data for multiple markets
+    df = generate_random_data(100, volatility=0.5, trend=0.1, noise_level=0.1)
+    df1 = generate_random_data(100, volatility=0.5, trend=0.3, noise_level=0.2)
+    df2 = generate_random_data(100, volatility=0.5, trend=0.2, noise_level=0.3)
+
+    # Associate name to each market
+    df['Market'] = 'Market 1'
+    df1['Market'] = 'Market 2'
+    df2['Market'] = 'Market 3'
+
+    # Combine dataframes
+    combined_df = pd.concat([df, df1, df2])
+
+    # Dropdown to select market
+    market_selector = dcc.Dropdown(
+        id='market-selector',
+        options=[{'label': market, 'value': market} for market in combined_df['Market'].unique()],
+        value=combined_df['Market'].iloc[0]
+    )
+
+    return html.Div([market_selector, dcc.Graph(id='bollinger-graph')])
+
+def build_candlestick_content():
+    # Generate random data for multiple markets
+    df = generate_data_candlestick(100)
+    df1 = generate_data_candlestick(100)
+    df2 = generate_data_candlestick(100)
+
+    # Associate name to each market
+    df['Market'] = 'Market 1'
+    df1['Market'] = 'Market 2'
+    df2['Market'] = 'Market 3'
+
+    # Combine dataframes
+    combined_df = pd.concat([df, df1, df2])
+
+    # Dropdown to select markets
+    market_checkboxes = dcc.Checklist(
+        id='candlestick-selector',
+        options=[{'label': market, 'value': market} for market in combined_df['Market'].unique()],
+        value=[]
+    )
+
+    return html.Div([market_checkboxes, dcc.Graph(id='candlestick-graph')])
