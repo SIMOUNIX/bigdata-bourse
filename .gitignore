@@ -1,2 +1,5 @@
 data/
 boursorama.tar
+*__pycache__*
+docker/analyzer/apps.tgz
+docker/dashboard/apps.tgz
