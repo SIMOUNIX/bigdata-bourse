@@ -1,5 +1,3 @@
-# FILE THAT CONTAINS THE FUNCTION TO GENERATE RANDOM DATA FOR THE DASHBOARD
-
 import pandas as pd
 import numpy as np
 
@@ -14,6 +12,30 @@ engine = sqlalchemy.create_engine(DATABASE_URI)
 np.random.seed(0)
 num_days = 100
 
+def get_companies(mid):
+    """
+    Get companies from a market
+    """
+    query = f"SELECT * FROM companies WHERE mid = '{mid}'"
+    df = pd.read_sql(query, engine)
+    return df
+
+def get_daystocks(cid, start_date, end_date):
+    """
+    Get daystocks from a company between starting and ending dates
+    """
+    query = f"SELECT * FROM daystocks WHERE cid = '{cid}' AND date >= '{start_date}' AND date <= '{end_date}'"
+    df = pd.read_sql(query, engine)
+    return df
+
+def get_multiple_daystocks(cids, start_date, end_date):
+    """
+    Get daystocks from multiple companies between starting and ending dates
+    cids: list of companies ids
+    """
+    query = f"SELECT * FROM daystocks WHERE cid IN {tuple(cids)} AND date >= '{start_date}' AND date <= '{end_date}'" # tuple(cids) to avoid SQL injection
+    df = pd.read_sql(query, engine)
+    return df
 
 def generate_random_data(num_days, volatility, trend, noise_level):
     window_size = 20
