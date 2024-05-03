@@ -12,6 +12,25 @@ engine = sqlalchemy.create_engine(DATABASE_URI)
 np.random.seed(0)
 num_days = 100
 
+def get_markets():
+    """
+    Get all markets
+    """
+    
+    # markets = [
+    #     {"mid": 1, "name": "CAC 40", "alias": "CAC"},
+    #     {"mid": 2, "name": "DAX", "alias": "DAX"},
+    #     {"mid": 3, "name": "Dow Jones", "alias": "Dow"},
+    #     {"mid": 4, "name": "Nasdaq", "alias": "Nasdaq"},
+    #     {"mid": 5, "name": "FTSE 100", "alias": "FTSE"},
+    # ]
+    
+    # df = pd.DataFrame(markets)
+    
+    query = "SELECT * FROM markets"
+    df = pd.read_sql(query, engine)
+    return df
+
 def get_companies(mid):
     """
     Get companies from a market
@@ -62,13 +81,6 @@ def generate_random_data(num_days, volatility, trend, noise_level):
     }
     df = pd.DataFrame(data)
     return df
-
-
-def get_data_bollinger_bands(market):
-    query = f"SELECT * FROM daystocks WHERE cid = '{market}'"
-    df = pd.read_sql(query, engine)
-    return df
-
 
 def generate_every_year_total_sales():
     years = ["2018", "2019", "2020", "2021", "2022"]
