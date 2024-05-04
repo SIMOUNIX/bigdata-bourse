@@ -4,6 +4,7 @@ import numpy as np
 import glob
 import os
 import dateutil
+import time
 
 import timescaledb_model as tsdb
 
@@ -15,105 +16,179 @@ def clean_df(df):
     df = df.drop(columns=['symbol'])
     
     # drop rows with a 0 value in the column last
-    df = df[df['last'] != 0]
-    print('Clean done dude on god skibidi')
-    
-    # get the oldest name of the company for each symbol
-    oldest_names = df.groupby(level=1)['name'].transform('max')
-    # Updating the 'name' column with the oldest 'name'
-    df['name'] = oldest_names
+    # df = df[df['last'] != 0]
+    # remove parentheses and the letter c or s from the column last
+    df['last'] = df['last'].astype(str).str.replace(r'\([cs]\)', '', regex=True).replace(r' ', '', regex=True)
+
+    # convert the last column to float
+    df['last'] = df['last'].astype(float)
     return df
 
+def generate_path(year):
+    for path, _, files in os.walk(f'data/{year}'):
+        for file in files:
+            yield os.path.join(path, file)
+
 def create_path_df():
-    i = 0
+    start_time = time.time()
     # create 4 empty df with timestamp as index and 1 column being a path (string)
-    #df_compA, df_compB, df_amsterdam, df_peapme = pd.DataFrame(columns=['path'], index=pd.to_datetime([])), pd.DataFrame(columns=['path'], index=pd.to_datetime([])), pd.DataFrame(columns=['path'], index=pd.to_datetime([])), pd.DataFrame(columns=['path'], index=pd.to_datetime([]))
-    df_compA = pd.DataFrame(columns=['path'], index=pd.to_datetime([]))
-    #files_2019, files_2020, files_2021, files_2022, files_2023 = glob.glob(f'data/2019/*'), glob.glob(f'data/2020/*'), glob.glob(f'data/2021/*'), glob.glob(f'data/2022/*'), glob.glob(f'data/2023/*')
-    files_2019 = glob.glob(f'data/2019/*')
-    for file in (files_2019):#, files_2020, files_2021, files_2022, files_2023):
-        if i == 100:
-            break
-        #for file in files:
-        path = file.split('/')[-1]
-        path = path[:-4]
+    df_compA, df_compB, df_amsterdam, df_peapme = pd.DataFrame(columns=['path'], index=pd.to_datetime([])), pd.DataFrame(columns=['path'], index=pd.to_datetime([])), pd.DataFrame(columns=['path'], index=pd.to_datetime([])), pd.DataFrame(columns=['path'], index=pd.to_datetime([]))
+    # df_compA = pd.DataFrame(columns=['path'], index=pd.to_datetime([]))
+    files_2019, files_2020, files_2021, files_2022, files_2023 = generate_path(2019), generate_path(2020), generate_path(2021), generate_path(2022), generate_path(2023)
+    # files_2019 = glob.glob(f'data/2019/*')
+    for files in (files_2019, files_2020, files_2021, files_2022, files_2023):
+        for file in files:
+            path = file.split('/')[-1]
+            path = path[:-4]
+            path_without_letters  = ''.join([i for i in path if not i.isalpha()])
+            date = dateutil.parser.parse(path_without_letters)
+            if 'compA' in path:
+                df_compA.loc[date] = path
+            elif 'compB' in path:
+                df_compB.loc[date] = path
+            elif 'amsterdam' in path:
+                df_amsterdam.loc[date] = path
+            if 'peapme' in path:
+                df_peapme.loc[date] = path
+                
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"create_path_df: Execution time: {elapsed_time:.6f} seconds")
+
+    return df_compA, df_compB, df_amsterdam, df_peapme
+
+
+def feed_companies(df_compA, df_compB, df_amsterdam, df_peapme, year):
+    start_time = time.time()
+    df_compA = df_compA[df_compA.index.year == year]
+    latest_row_compA = df_compA.loc[df_compA.index.max()]
+    df_input_compA = pd.read_pickle(f'data/{str(year)}/{latest_row_compA["path"]}.bz2')
+    dfcompA = pd.DataFrame({'name': pd.Series([], dtype='str'), 'mid': pd.Series([], dtype='int'), 'symbol': pd.Series([], dtype='str'), 'symbol_nf': pd.Series([], dtype='str'), 'isin': pd.Series([], dtype='str'), 'reuters': pd.Series([], dtype='str'), 'boursorama': pd.Series([], dtype='str'), 'pea': pd.Series([], dtype='bool'), 'sector': pd.Series([], dtype='int')})
+    for row in df_input_compA.iterrows():
+        query = db.raw_query(f"SELECT * FROM companies WHERE symbol = '{row[1]['symbol']}'")
+        if query:
+            db.execute(f"UPDATE companies SET symbol = '{row[1]['symbol']}' WHERE symbol = '{row[1]['symbol']}'")
+        else:
+            new_row = {'name': row[1]['name'], 'mid': 1, 'symbol': row[1]['symbol'], 'symbol_nf': None, 'isin': None, 'reuters': None, 'boursorama': None, 'pea': False, 'sector': 0}
+            dfcompA = pd.concat([dfcompA, pd.DataFrame(new_row, index=[0])], ignore_index=True)
+    db.df_write_optimized(dfcompA, table="companies")
+    db.commit()
+    
+    df_compB = df_compB[df_compB.index.year == year]
+    latest_row_compB = df_compB.loc[df_compB.index.max()]
+    df_input_compB = pd.read_pickle(f'data/{str(year)}/{latest_row_compB["path"]}.bz2')
+    dfcompB = pd.DataFrame({'name': pd.Series([], dtype='str'), 'mid': pd.Series([], dtype='int'), 'symbol': pd.Series([], dtype='str'), 'symbol_nf': pd.Series([], dtype='str'), 'isin': pd.Series([], dtype='str'), 'reuters': pd.Series([], dtype='str'), 'boursorama': pd.Series([], dtype='str'), 'pea': pd.Series([], dtype='bool'), 'sector': pd.Series([], dtype='int')})
+    for row in df_input_compB.iterrows():
+        query = db.raw_query(f"SELECT * FROM companies WHERE symbol = '{row[1]['symbol']}'")
+        if query:
+            db.execute(f"UPDATE companies SET symbol = '{row[1]['symbol']}' WHERE symbol = '{row[1]['symbol']}'")
+        else:
+            new_row = {'name': row[1]['name'], 'mid': 1, 'symbol': row[1]['symbol'], 'symbol_nf': None, 'isin': None, 'reuters': None, 'boursorama': None, 'pea': False, 'sector': 0}
+            dfcompB = pd.concat([dfcompB, pd.DataFrame(new_row, index=[0])], ignore_index=True)
+    db.df_write_optimized(dfcompB, table="companies")
+    db.commit()
+    
+    df_amsterdam = df_amsterdam[df_amsterdam.index.year == year]
+    latest_row_amsterdam = df_amsterdam.loc[df_amsterdam.index.max()]
+    df_input_amsterdam = pd.read_pickle(f'data/{str(year)}/{latest_row_amsterdam["path"]}.bz2')
+    dfamsterdam = pd.DataFrame({'name': pd.Series([], dtype='str'), 'mid': pd.Series([], dtype='int'), 'symbol': pd.Series([], dtype='str'), 'symbol_nf': pd.Series([], dtype='str'), 'isin': pd.Series([], dtype='str'), 'reuters': pd.Series([], dtype='str'), 'boursorama': pd.Series([], dtype='str'), 'pea': pd.Series([], dtype='bool'), 'sector': pd.Series([], dtype='int')})
+    for row in df_input_amsterdam.iterrows():
+        query = db.raw_query(f"SELECT * FROM companies WHERE symbol = '{row[1]['symbol']}'")
+        if query:
+            db.execute(f"UPDATE companies SET symbol = '{row[1]['symbol']}' WHERE symbol = '{row[1]['symbol']}'")
+        else:
+            new_row = {'name': row[1]['name'], 'mid': 1, 'symbol': row[1]['symbol'], 'symbol_nf': None, 'isin': None, 'reuters': None, 'boursorama': None, 'pea': False, 'sector': 0}
+            dfamsterdam = pd.concat([dfamsterdam, pd.DataFrame(new_row, index=[0])], ignore_index=True)
+    db.df_write_optimized(dfamsterdam, table="companies")
+    db.commit()
+    
+    if year >= 2021:
+        df_peapme = df_peapme[df_peapme.index.year == year]
+        latest_row_peapme = df_peapme.loc[df_peapme.index.max()]
+        df_input_peapme = pd.read_pickle(f'data/{str(year)}/{latest_row_peapme["path"]}.bz2')
+        dfpeapme = pd.DataFrame({'name': pd.Series([], dtype='str'), 'mid': pd.Series([], dtype='int'), 'symbol': pd.Series([], dtype='str'), 'symbol_nf': pd.Series([], dtype='str'), 'isin': pd.Series([], dtype='str'), 'reuters': pd.Series([], dtype='str'), 'boursorama': pd.Series([], dtype='str'), 'pea': pd.Series([], dtype='bool'), 'sector': pd.Series([], dtype='int')})
+        for row in df_input_peapme.iterrows():
+            query = db.raw_query(f"SELECT * FROM companies WHERE symbol = '{row[1]['symbol']}'")
+            if query:
+                db.execute(f"UPDATE companies SET symbol = '{row[1]['symbol']}' WHERE symbol = '{row[1]['symbol']}'")
+            else:
+                new_row = {'name': row[1]['name'], 'mid': 1, 'symbol': row[1]['symbol'], 'symbol_nf': None, 'isin': None, 'reuters': None, 'boursorama': None, 'pea': True, 'sector': 0}
+                dfpeapme = pd.concat([dfpeapme, pd.DataFrame(new_row, index=[0])], ignore_index=True)
+        db.df_write_optimized(dfpeapme, table="companies")
+        db.commit()
+    
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"feed companies: Execution time: {elapsed_time:.6f} seconds")    
+        
+    
+def feed_stocks(path_df, market_id):
+    # stocks table : date: datetime, cid: int, value: float, volume: bigint
+    start_time = time.time()
+    for file in path_df.iterrows():
+        # print(file)
+        path = file[1]['path'].split('/')[-1]
         path_without_letters  = ''.join([i for i in path if not i.isalpha()])
         date = dateutil.parser.parse(path_without_letters)
-        if 'compA' in path:
-            df_compA.loc[date] = path
-        # elif 'compB' in path:
-        #     df_compB.loc[date] = path
-        # elif 'amsterdam' in path:
-        #     df_amsterdam.loc[date] = path
-        # elif 'peapme' in path:
-        #     df_peapme.loc[date] = path
-        i += 1
-    return df_compA#, df_compB, df_amsterdam, df_peapme
+        year = str(date.year)
+        df_input = pd.read_pickle(f'data/{year}/{file[1]["path"]}.bz2')
+        df_input = clean_df(df_input)
 
-def feed_companies(df_compA):#, df_compB, df_amsterdam, df_peapme):
-    # companies db : id:smallint, name:varchar, market_id:smallint, symbol:varchar, symbol_nf:varchar, isin:char(12), reuters:varchar, boursorama:varchar, pea:boolean, sector:integer
-    market_map = {1 : "euronx", 2 : "lse",
-                        3: "milano", 4: "dbx",
-                        5: "mercados",6:"amsterdam",
-                        7:"compA",8:"compB",
-                        9:"xetra",10:"bruxelle"}
+        df_output = pd.DataFrame({'date': pd.Series([], dtype='datetime64[ns]'), 'cid': pd.Series([], dtype='int'), 'value': pd.Series([], dtype='float'), 'volume': pd.Series([], dtype='int')})
+        for row in df_input.iterrows():
+            pea = True if market_id == 1 else False
+            cid = db.search_company_id_with_symbol(row[0], market=market_id, name=row[1]['name'], pea=pea)
+            new_row = {'date': date, 'cid': cid, 'value': float(row[1]['last']), 'volume': int(row[1]['volume'])}
+            df_output = pd.concat([df_output, pd.DataFrame(new_row, index=[0])], ignore_index=True)
+        db.df_write_optimized(df_output, table="stocks")
+        db.commit()               
     
-    # getting the last day to have the last company names
-    # checked the data and all the rows are unique (no duplicates)
-    last_rows = df_compA.loc['2019-12-31']
-    df = pd.read_pickle(f'data/2019/{last_rows["path"][0]}.bz2')
-    for row in df.iterrows():
-        df = pd.DataFrame(columns=['id', 'name', 'market_id', 'symbol', 'symbol_nf', 'isin', 'reuters', 'boursorama', 'pea', 'sector'])
-        df['name'] = row[1]['name']
-        df['mid'] = 7
-        df['symbol'] = row[1]['symbol']
-        df['symbol_nf'] = None
-        df['isin'] = None
-        df['reuters'] = None
-        df['boursorama'] = None
-        df['pea'] = None
-        df['sector'] = None
-        # insertion in db does not work, idk why
-        db.df_write(df, table="companies", if_exists="append", index=False)
-        db.commit()
+    
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"feed_stocks: Execution time: {elapsed_time:.6f} seconds")
 
-# not tested
-def feed_stocks(df):
-    # stocks db : date: timestamptz, cid: smallint, value: float4, volume:int
-    for row in df.iterrows():
-        df = pd.DataFrame(columns=['date', 'cid', 'value', 'volume'])
-        df['date'] = row[0]
-        df['cid'] = 1
-        df['value'] = row[1]['last']
-        df['volume'] = row[1]['volume']
-        db.df_write(df, table="stocks", if_exists="append", index=False)
-        db.commit()
-        
-def feed_daystocks(df):
-    pass
-
-def file_done(path):
-    pass
+    
+def feed_daystocks():
+    start_time = time.time()
+    db.execute('''
+        INSERT INTO DAYSTOCKS (date, cid, open, close, high, low, volume)
+        SELECT
+            date::date AS date,
+            cid,
+            (SELECT value FROM STOCKS s1 WHERE s1.date = MIN(s.date) AND s1.cid = s.cid) AS open,
+            (SELECT value FROM STOCKS s2 WHERE s2.date = MAX(s.date) AND s2.cid = s.cid) AS close,
+            MAX(value) AS high,
+            MIN(value) AS low,
+            MAX(volume) AS volume
+        FROM STOCKS s
+        WHERE cid != 0
+        GROUP BY date::date, cid;        ;
+        ''')
+    db.commit()
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"feed_daystocks: Execution time: {elapsed_time:.6f} seconds")
 
 if __name__ == '__main__':
-    df_compA = create_path_df()
-    feed_companies(df_compA)
+    start_time = time.time()
+    db.clean_all_tables()
+
+    df_compA, df_compB, df_amsterdam, df_peapme = create_path_df()
+    for year in range(2019, 2024):
+        feed_companies(df_compA, df_compB, df_amsterdam, df_peapme, year)
+    feed_stocks(df_compA, 7)
+    feed_stocks(df_compB, 8)
+    feed_stocks(df_amsterdam, 6)
+    feed_stocks(df_peapme, 1)
+    feed_daystocks()
+    
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Execution time: {elapsed_time:.6f} seconds")
+
+            
+    # print("---- LOGS ----")
+    # with open("/tmp/bourse.log", "r") as file:
+    #     print(file.read())
     print("Done")
-
-
-# def store_file(name, website):
-#     name += ".bz2"
-#     query = tsdb.is_file_done(name)
-#     print(query)
-#     if query[0][0] is not None:
-#         return
-#     if website.lower() == "boursorama":
-#         try:
-#             df = pd.read_pickle("data/" + name)  # is this dir ok for you ?
-#             print(df.head())
-#         except:
-#             year = name.split()[1].split("-")[0]
-#             df = pd.read_pickle("data/" + year + "/" + name)
-#             print(df.info())
-#             print(df.head())
-#         #db.df_write(df, "file_done")

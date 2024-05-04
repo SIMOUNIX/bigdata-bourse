@@ -7,6 +7,8 @@ import datetime
 import psycopg2
 import pandas as pd
 import sqlalchemy
+from io import StringIO
+
 
 import mylogging
 
@@ -82,7 +84,7 @@ class TimescaleStockMarketModel:
                   date TIMESTAMPTZ,
                   cid SMALLINT,
                   value FLOAT4,
-                  volume INT
+                  volume BIGINT
                 );''')
             cursor.execute('''SELECT create_hypertable('stocks', by_range('date'));''')
             cursor.execute('''CREATE INDEX idx_cid_stocks ON stocks (cid, date DESC);''')
@@ -94,7 +96,7 @@ class TimescaleStockMarketModel:
                   close FLOAT4,
                   high FLOAT4,
                   low FLOAT4,
-                  volume INT
+                  volume BIGINT
                 );''')
             cursor.execute('''SELECT create_hypertable('daystocks', by_range('date'));''')
             cursor.execute('''CREATE INDEX idx_cid_daystocks ON daystocks (cid, date DESC);''')
@@ -233,12 +235,47 @@ class TimescaleStockMarketModel:
             return [r[0] for r in res]
         else:
             return 0
+        
+    def search_company_id_with_symbol(self, symbol, getmax=1, strict=False, market=None, name=None, pea=None):
+        # find the id of a company in our database using the symbol
+        res = self.raw_query('SELECT (id) FROM companies WHERE symbol = %s', (symbol,))
+        if len(res) >= 1 and len(res) < getmax:
+            return res[0][0]
+        else:
+            return 0
+    
+
+    def df_write_optimized(self, df, table, commit=False):
+        sio = StringIO()
+        sio.write(df.to_csv(index=False, header=False))
+        sio.seek(0)
+        cursor = self.__connection.cursor()
+        cursor.copy_from(file=sio,
+                    table= table,
+                    columns=df.columns,
+                    sep=',')
+        if commit:
+            self.commit()
 
     def is_file_done(name):
         '''
         Check if a file has already been included in the DB
         '''
         return self.raw_query("SELECT EXISTS ( SELECT 1 FROM file_done WHERE name = '%s' );" % name)
+    
+    # create a method that drop all tables and reset all indexes using execute
+    def clean_all_tables(self):
+        self.execute("DELETE FROM companies")
+        self.execute("DELETE FROM stocks")
+        self.execute("DELETE FROM daystocks")
+        self.execute("DELETE FROM file_done")
+        self.execute("DELETE FROM tags")
+        self.execute("DELETE FROM markets")
+        self.execute("ALTER SEQUENCE company_id_seq RESTART WITH 1")
+        self.execute("ALTER SEQUENCE market_id_seq RESTART WITH 1")
+        self.commit()
+
+        
 
 
 #
