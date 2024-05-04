@@ -7,9 +7,11 @@ import plotly.graph_objects as go
 from datetime import date
 
 from utils import (
-    build_every_year_total_sales_content,
-    generate_random_data,
-    generate_data_candlestick,
+    get_markets,
+    get_companies,
+    get_daystocks,
+    get_multiple_daystocks,
+    get_start_end_dates_for_selected_companies,
     generate_menu_buttons,
     build_bollinger_content,
     build_candlestick_content,
@@ -20,8 +22,8 @@ external_stylesheets = [
     "docker/dashboard/dashboard/assets/lookgood.css",
 ]
 
-# DATABASE_URI = 'timescaledb://ricou:monmdp@db:5432/bourse'    # inside docker
-DATABASE_URI = "timescaledb://ricou:monmdp@localhost:5432/bourse"  # outside docker
+DATABASE_URI = 'timescaledb://ricou:monmdp@db:5432/bourse'    # inside docker
+# DATABASE_URI = "timescaledb://ricou:monmdp@localhost:5432/bourse"  # outside docker
 engine = sqlalchemy.create_engine(DATABASE_URI)
 
 app = dash.Dash(
@@ -32,16 +34,7 @@ app = dash.Dash(
 )
 server = app.server
 
-# Initialize Dash app
-app = dash.Dash(
-    __name__,
-    title="Bourse",
-    suppress_callback_exceptions=True,
-    external_stylesheets=external_stylesheets,
-)
-server = app.server
-
-# Define layout
+# define layout
 app.layout = html.Div(
     [
         html.Div(
@@ -130,7 +123,7 @@ def get_page_content(
     button_id, id_home, id_share_price, id_bollinger_bands, id_raw_data
 ):
     if button_id == "btn-dashboard":
-        content = build_every_year_total_sales_content()
+        content = "Dashboard Content"
         active_button_id = id_home
     elif button_id == "btn-share-price":
         content = build_candlestick_content()
@@ -147,76 +140,81 @@ def get_page_content(
 
     return content, active_button_id
 
-
-import plotly.graph_objects as go
-import pandas as pd
-
+@app.callback(
+    [
+        Output("date-picker", "start_date"),
+        Output("date-picker", "end_date"),
+    ],
+    [
+        Input("market-selector", "value"),
+        Input("company-input", "value"),
+    ],
+)
+def update_date_range_for_company_selection(market_id, company_id):
+    # get the start and end dates for the selected company
+    start_date, end_date = get_start_end_dates_for_selected_companies(company_id).values[0]
+    return start_date, end_date
 
 @app.callback(
     Output("bollinger-graph", "figure"),
     [
         Input("market-selector", "value"),
+        Input("company-input", "value"),
         Input("date-picker", "start_date"),
         Input("date-picker", "end_date"),
     ],
 )
-def update_bollinger_graph(selected_market, start_date, end_date):
-    # Generate random data for multiple markets
-    df = generate_random_data(100, volatility=0.5, trend=0.1, noise_level=0.1)
-    df1 = generate_random_data(100, volatility=0.5, trend=0.3, noise_level=0.2)
-    df2 = generate_random_data(100, volatility=0.5, trend=0.2, noise_level=0.3)
+def update_bollinger_graph(market_id, company_id, start_date, end_date):
+    # retrieve data for the selected market, company, and date range
+    daystocks_data = get_daystocks(company_id, start_date, end_date)
+    
+    # compute the mean and standard deviation of the closing prices
+    rolling_mean = daystocks_data["close"].rolling(window=20).mean()
+    rolling_std = daystocks_data["close"].rolling(window=20).std()
+    upper_band = rolling_mean + (rolling_std * 2)
+    lower_band = rolling_mean - (rolling_std * 2)
 
-    # Associate name to each market
-    df["Market"] = "Market 1"
-    df1["Market"] = "Market 2"
-    df2["Market"] = "Market 3"
-
-    # Combine dataframes
-    combined_df = pd.concat([df, df1, df2])
-
-    # Filter data based on selected market
-    selected_market_data = combined_df[combined_df["Market"] == selected_market]
-
-    # Filter data based on selected date range
-    selected_market_data = selected_market_data[
-        (selected_market_data["Date"] >= start_date)
-        & (selected_market_data["Date"] <= end_date)
-    ]
-
+    # update the Bollinger Bands graph figure
+    
+    # add the price line to the figure
     fig = go.Figure()
-
-    # Adding traces for each line
     fig.add_trace(
         go.Scatter(
-            x=selected_market_data["Date"],
-            y=selected_market_data["Close"],
+            x=daystocks_data["date"],
+            y=daystocks_data["close"],
             mode="lines",
             name="Close",
             line=dict(color="royalblue"),
         )
     )
+    
+    # add the SMA
     fig.add_trace(
         go.Scatter(
-            x=selected_market_data["Date"],
-            y=selected_market_data["SMA"],
+            x=daystocks_data["date"],
+            y=rolling_mean,
             mode="lines",
             name="SMA",
             line=dict(color="darkorange", width=2, dash="dot"),
         )
     )
+    
+    # add the highest values
     fig.add_trace(
         go.Scatter(
-            x=selected_market_data["Date"],
-            y=selected_market_data["UB"],
+            x=daystocks_data["date"],
+            y=upper_band,
             mode="lines",
             name="Upper Band",
             line=dict(color="forestgreen", width=1, dash="dash"),
         )
     )
+    
+    # add the lowest values
     fig.add_trace(
         go.Scatter(
-            x=selected_market_data["Date"],
-            y=selected_market_data["LB"],
+            x=daystocks_data["date"],
+            y=lower_band,
             mode="lines",
             name="Lower Band",
             line=dict(color="firebrick", width=1, dash="dash"),
@@ -224,11 +222,8 @@ def update_bollinger_graph(selected_market, start_date, end_date):
             fillcolor="rgba(255, 0, 0, 0.1)",
         )
     )
-
-    # Adding hover information
-    fig.update_traces(hoverinfo="x+y", hovertemplate="%{x}<br>%{y:.4f}")
-
-    # Adjusting axis labels and title
+    
+    # update layout: style the figure
     fig.update_layout(
         title="Bollinger Bands",
         xaxis_title="Date",
@@ -238,126 +233,84 @@ def update_bollinger_graph(selected_market, start_date, end_date):
         margin=dict(l=50, r=50, t=80, b=50),  # Adjust margins
         hovermode="x",
         xaxis=dict(gridcolor="lightgrey"),  # Customize grid lines
-        yaxis=dict(gridcolor="lightgrey"),
-    )  # Customize grid lines)
-
-    # Setting y-axis range without overwriting
-    min_price = min(
-        selected_market_data["LB"].min(), selected_market_data["Close"].min()
-    )
-    max_price = max(
-        selected_market_data["UB"].max(), selected_market_data["Close"].max()
-    )
-
-    # Adding annotations for crossing points
-    for index, row in selected_market_data.iterrows():
-        if row["Close"] > row["UB"]:
-            fig.add_annotation(
-                x=row["Date"],
-                y=row["Close"],
-                text="Above Upper Band",
-                showarrow=True,
-                arrowhead=1,
-                arrowcolor="red",
-                ax=0,
-                ay=-40,
-            )
-        elif row["Close"] < row["LB"]:
-            fig.add_annotation(
-                x=row["Date"],
-                y=row["Close"],
-                text="Below Lower Band",
-                showarrow=True,
-                arrowhead=1,
-                arrowcolor="green",
-                ax=0,
-                ay=40,
-            )
-
-    # Update legend orientation
-    fig.update_layout(
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-
-    # Customize layout
-    fig.update_layout()
-
-    return fig
-
-
-@app.callback(
-    Output("candlestick-graph", "figure"),
-    [
-        Input("candlestick-selector", "value"),
-        Input("date-picker", "start_date"),
-        Input("date-picker", "end_date"),
-    ],
-)
-def update_candlestick_graph(selected_markets, start_date, end_date):
-    if not selected_markets:
-        return {}
-
-    dfs = generate_data_for_selected_markets(selected_markets)
-
-    fig = go.Figure()
-    for df, color in dfs:
-        filtered_df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
-        decreasing_color = lighten_color(color)
-        fig.add_trace(
-            go.Candlestick(
-                x=filtered_df["Date"],
-                open=filtered_df["Open"],
-                high=filtered_df["High"],
-                low=filtered_df["Low"],
-                close=filtered_df["Close"],
-                name=filtered_df["Market"].iloc[0],
-                increasing_line_color=color,
-                decreasing_line_color=decreasing_color,
-                line=dict(width=1),  # Customize candlestick width
-            )
-        )
-
-    fig.update_layout(
-        title="Candlestick Chart",
-        xaxis_title="Date",
-        yaxis_title="Price",
-        plot_bgcolor="white",  # Set plot background color
-        font=dict(family="Arial", size=12),
-        margin=dict(l=50, r=50, t=80, b=50),  # Adjust margins
-        hovermode="x",
-        showlegend=True,
-        legend=dict(
-            font=dict(family="Arial", size=10),
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1,
-        ),
-        xaxis=dict(gridcolor="lightgrey"),  # Customize grid lines
         yaxis=dict(gridcolor="lightgrey"),  # Customize grid lines
     )
 
     return fig
 
+# @app.callback(
+#     Output("candlestick-graph", "figure"),
+#     [
+#         Input("candlestick-selector", "value"),
+#         Input("date-picker", "start_date"),
+#         Input("date-picker", "end_date"),
+#     ],
+# )
+# def update_candlestick_graph(selected_markets, start_date, end_date):
+#     if not selected_markets:
+#         return {}
 
-def generate_data_for_selected_markets(selected_markets):
-    dfs = []
-    colors = {"Market 1": "#636EFA", "Market 2": "#EF553B", "Market 3": "#00CC96"}
+#     dfs = generate_data_for_selected_markets(selected_markets)
 
-    for market in selected_markets:
-        if market == "Market 1":
-            df = generate_data_candlestick(100)
-            df["Market"] = "Market 1"
-        elif market == "Market 2":
-            df = generate_data_candlestick(100)
-            df["Market"] = "Market 2"
-        elif market == "Market 3":
-            df = generate_data_candlestick(100)
-            df["Market"] = "Market 3"
-        dfs.append((df, colors[market]))
+#     fig = go.Figure()
+#     for df, color in dfs:
+#         filtered_df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
+#         decreasing_color = lighten_color(color)
+#         fig.add_trace(
+#             go.Candlestick(
+#                 x=filtered_df["Date"],
+#                 open=filtered_df["Open"],
+#                 high=filtered_df["High"],
+#                 low=filtered_df["Low"],
+#                 close=filtered_df["Close"],
+#                 name=filtered_df["Market"].iloc[0],
+#                 increasing_line_color=color,
+#                 decreasing_line_color=decreasing_color,
+#                 line=dict(width=1),  # Customize candlestick width
+#             )
+#         )
 
-    return dfs
+#     fig.update_layout(
+#         title="Candlestick Chart",
+#         xaxis_title="Date",
+#         yaxis_title="Price",
+#         plot_bgcolor="white",  # Set plot background color
+#         font=dict(family="Arial", size=12),
+#         margin=dict(l=50, r=50, t=80, b=50),  # Adjust margins
+#         hovermode="x",
+#         showlegend=True,
+#         legend=dict(
+#             font=dict(family="Arial", size=10),
+#             orientation="h",
+#             yanchor="bottom",
+#             y=1.02,
+#             xanchor="right",
+#             x=1,
+#         ),
+#         xaxis=dict(gridcolor="lightgrey"),  # Customize grid lines
+#         yaxis=dict(gridcolor="lightgrey"),  # Customize grid lines
+#     )
+
+#     return fig
+
+
+# def generate_data_for_selected_markets(selected_markets):
+#     dfs = []
+#     colors = {"Market 1": "#636EFA", "Market 2": "#EF553B", "Market 3": "#00CC96"}
+
+#     for market in selected_markets:
+#         if market == "Market 1":
+#             df = generate_data_candlestick(100)
+#             df["Market"] = "Market 1"
+#         elif market == "Market 2":
+#             df = generate_data_candlestick(100)
+#             df["Market"] = "Market 2"
+#         elif market == "Market 3":
+#             df = generate_data_candlestick(100)
+#             df["Market"] = "Market 3"
+#         dfs.append((df, colors[market]))
+
+#     return dfs
 
 
 def lighten_color(color, factor=0.5):
