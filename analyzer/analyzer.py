@@ -125,7 +125,7 @@ def feed_companies(df_compA, df_compB, df_amsterdam, df_peapme, year):
     print(f"feed companies: Execution time: {elapsed_time:.6f} seconds")    
         
     
-def feed_stocks(path_df, market_id, companies_map):
+def feed_stocks(path_df, market_id, companies_map, companies_map_with_name):
     # stocks table : date: datetime, cid: int, value: float, volume: bigint
     start_time = time.time()
     print(f"feed stocks for market {market_id} starting...")
@@ -141,8 +141,11 @@ def feed_stocks(path_df, market_id, companies_map):
         df_output = pd.DataFrame({'date': pd.Series([], dtype='datetime64[ns]'), 'cid': pd.Series([], dtype='int'), 'value': pd.Series([], dtype='float'), 'volume': pd.Series([], dtype='int')})
         for row in df_input.iterrows():
             if row[0] not in companies_map:
-                companies_map[row[0]] = len(companies_map) + 1
-            cid = companies_map[row[0]]
+                cid = len(companies_map) + 1
+                companies_map[row[0]] = cid
+                companies_map_with_name[row[0]] = (cid, row[1]['name'])
+            else:   
+                cid = companies_map[row[0]]
             new_row = {'date': date, 'cid': cid, 'value': float(row[1]['last']), 'volume': int(row[1]['volume'])}
             df_output = pd.concat([df_output, pd.DataFrame(new_row, index=[0])], ignore_index=True)
         db.df_write_optimized(df_output, table="stocks")
@@ -152,6 +155,7 @@ def feed_stocks(path_df, market_id, companies_map):
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"feed_stocks for market {market_id}: Execution time: {elapsed_time:.6f} seconds")
+    return companies_map, companies_map_with_name
 
     
 def feed_daystocks():
@@ -178,12 +182,24 @@ def feed_daystocks():
     
 def generate_companies_map(query_result):
     companies_map = {}
+    companies_map_with_name = {}
     for result in query_result:
         result = result[0]
-        # result is of type string like "(1, 'AAPL')"
+        # result is of type string like "(1, 'AAPL', 'Amazon')"
         result = result[1:-1].split(',')
         companies_map[result[1]] = int(result[0])
-    return companies_map
+        companies_map_with_name[result[1]] = (int(result[0]), result[2])
+    return companies_map, companies_map_with_name
+
+def add_new_companies(companies_map, old_len, market_id):
+    # companies table : name: str, mid: int, symbol: str, symbol_nf: str, isin: str, reuters: str, boursorama: str, pea: bool, sector: int
+    df = pd.DataFrame({'name': pd.Series([], dtype='str'), 'mid': pd.Series([], dtype='int'), 'symbol': pd.Series([], dtype='str'), 'symbol_nf': pd.Series([], dtype='str'), 'isin': pd.Series([], dtype='str'), 'reuters': pd.Series([], dtype='str'), 'boursorama': pd.Series([], dtype='str'), 'pea': pd.Series([], dtype='bool'), 'sector': pd.Series([], dtype='int')})
+    for i in range(old_len, len(companies_map)):
+        pea = True if market_id == 1 else False
+        new_row = {'name': companies_map[i][1], 'mid': market_id, 'symbol': companies_map[i][0], 'symbol_nf': None, 'isin': None, 'reuters': None, 'boursorama': None, 'pea': pea, 'sector': 0}
+        df = pd.concat([df, pd.DataFrame(new_row, index=[0])], ignore_index=True)
+    db.df_write_optimized(df, table="companies")
+    db.commit()
 
 if __name__ == '__main__':
     print("Start")
@@ -194,13 +210,18 @@ if __name__ == '__main__':
     for year in range(2019, 2024):
         feed_companies(df_compA, df_compB, df_amsterdam, df_peapme, year)
     feed_companies(df_compA, df_compB, df_amsterdam, df_peapme, 2019)
-    companies = db.raw_query('''SELECT (id, symbol) from companies;''')
-    companies_map = generate_companies_map(companies)
+    companies = db.raw_query('''SELECT (id, symbol, name) from companies;''')
+    companies_map, companies_map_with_name = generate_companies_map(companies)
     
-    feed_stocks(df_compA, 7, companies_map)
-    feed_stocks(df_compB, 8, companies_map)
-    feed_stocks(df_amsterdam, 6, companies_map)
-    feed_stocks(df_peapme, 1, companies_map)
+    companies_map, companies_map_with_name = feed_stocks(df_compA, 7, companies_map, companies_map_with_name)
+    add_new_companies(companies_map, len(companies_map), 7)
+    companies_map, companies_map_with_name = feed_stocks(df_compB, 8, companies_map, companies_map_with_name)
+    add_new_companies(companies_map, len(companies_map), 8)
+    companies_map, companies_map_with_name = feed_stocks(df_amsterdam, 6, companies_map, companies_map_with_name)
+    add_new_companies(companies_map, len(companies_map), 6)
+    companies_map, companies_map_with_name = feed_stocks(df_peapme, 1, companies_map, companies_map_with_name)
+    add_new_companies(companies_map, len(companies_map), 1)
+    
     feed_daystocks()
     
     end_time = time.time()
