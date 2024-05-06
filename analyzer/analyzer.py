@@ -31,6 +31,7 @@ def generate_path(year):
 
 def create_path_df():
     start_time = time.time()
+    print("create_path_df starting...")
     # create 4 empty df with timestamp as index and 1 column being a path (string)
     df_compA, df_compB, df_amsterdam, df_peapme = pd.DataFrame(columns=['path'], index=pd.to_datetime([])), pd.DataFrame(columns=['path'], index=pd.to_datetime([])), pd.DataFrame(columns=['path'], index=pd.to_datetime([])), pd.DataFrame(columns=['path'], index=pd.to_datetime([]))
     # df_compA = pd.DataFrame(columns=['path'], index=pd.to_datetime([]))
@@ -50,6 +51,7 @@ def create_path_df():
                 df_amsterdam.loc[date] = path
             if 'peapme' in path:
                 df_peapme.loc[date] = path
+        print(f"Year {date.year} done.")
                 
     end_time = time.time()
     elapsed_time = end_time - start_time
@@ -59,6 +61,7 @@ def create_path_df():
 
 
 def feed_companies(df_compA, df_compB, df_amsterdam, df_peapme, year):
+    print(f"feed companies for year {year} starting...")
     start_time = time.time()
     df_compA = df_compA[df_compA.index.year == year]
     latest_row_compA = df_compA.loc[df_compA.index.max()]
@@ -122,9 +125,10 @@ def feed_companies(df_compA, df_compB, df_amsterdam, df_peapme, year):
     print(f"feed companies: Execution time: {elapsed_time:.6f} seconds")    
         
     
-def feed_stocks(path_df, market_id):
+def feed_stocks(path_df, market_id, companies_map):
     # stocks table : date: datetime, cid: int, value: float, volume: bigint
     start_time = time.time()
+    print(f"feed stocks for market {market_id} starting...")
     for file in path_df.iterrows():
         # print(file)
         path = file[1]['path'].split('/')[-1]
@@ -136,8 +140,9 @@ def feed_stocks(path_df, market_id):
 
         df_output = pd.DataFrame({'date': pd.Series([], dtype='datetime64[ns]'), 'cid': pd.Series([], dtype='int'), 'value': pd.Series([], dtype='float'), 'volume': pd.Series([], dtype='int')})
         for row in df_input.iterrows():
-            pea = True if market_id == 1 else False
-            cid = db.search_company_id_with_symbol(row[0], market=market_id, name=row[1]['name'], pea=pea)
+            if row[0] not in companies_map:
+                companies_map[row[0]] = len(companies_map) + 1
+            cid = companies_map[row[0]]
             new_row = {'date': date, 'cid': cid, 'value': float(row[1]['last']), 'volume': int(row[1]['volume'])}
             df_output = pd.concat([df_output, pd.DataFrame(new_row, index=[0])], ignore_index=True)
         db.df_write_optimized(df_output, table="stocks")
@@ -146,11 +151,12 @@ def feed_stocks(path_df, market_id):
     
     end_time = time.time()
     elapsed_time = end_time - start_time
-    print(f"feed_stocks: Execution time: {elapsed_time:.6f} seconds")
+    print(f"feed_stocks for market {market_id}: Execution time: {elapsed_time:.6f} seconds")
 
     
 def feed_daystocks():
     start_time = time.time()
+    print("feed daystocks starting...")
     db.execute('''
         INSERT INTO DAYSTOCKS (date, cid, open, close, high, low, volume)
         SELECT
@@ -169,18 +175,32 @@ def feed_daystocks():
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"feed_daystocks: Execution time: {elapsed_time:.6f} seconds")
+    
+def generate_companies_map(query_result):
+    companies_map = {}
+    for result in query_result:
+        result = result[0]
+        # result is of type string like "(1, 'AAPL')"
+        result = result[1:-1].split(',')
+        companies_map[result[1]] = int(result[0])
+    return companies_map
 
 if __name__ == '__main__':
+    print("Start")
     start_time = time.time()
     db.clean_all_tables()
 
     df_compA, df_compB, df_amsterdam, df_peapme = create_path_df()
     for year in range(2019, 2024):
         feed_companies(df_compA, df_compB, df_amsterdam, df_peapme, year)
-    feed_stocks(df_compA, 7)
-    feed_stocks(df_compB, 8)
-    feed_stocks(df_amsterdam, 6)
-    feed_stocks(df_peapme, 1)
+    feed_companies(df_compA, df_compB, df_amsterdam, df_peapme, 2019)
+    companies = db.raw_query('''SELECT (id, symbol) from companies;''')
+    companies_map = generate_companies_map(companies)
+    
+    feed_stocks(df_compA, 7, companies_map)
+    feed_stocks(df_compB, 8, companies_map)
+    feed_stocks(df_amsterdam, 6, companies_map)
+    feed_stocks(df_peapme, 1, companies_map)
     feed_daystocks()
     
     end_time = time.time()

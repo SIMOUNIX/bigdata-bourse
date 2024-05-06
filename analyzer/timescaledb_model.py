@@ -238,23 +238,15 @@ class TimescaleStockMarketModel:
         
     def search_company_id_with_symbol(self, symbol, getmax=1, strict=False, market=None, name=None, pea=None):
         # find the id of a company in our database using the symbol
-        res = self.raw_query('SELECT (id) FROM companies WHERE symbol = %s', (symbol,))
-        if len(res) >= 1 and len(res) < getmax:
-            return res[0][0]
-        else:
-            return 0
+        pass
     
 
     def df_write_optimized(self, df, table, commit=False):
         sio = StringIO()
-        sio.write(df.to_csv(index=False, header=False))
+        df.to_csv(sio, sep='\t', header=False, index=False)
         sio.seek(0)
-        cursor = self.__connection.cursor()
-        cursor.copy_from(file=sio,
-                    table= table,
-                    columns=df.columns,
-                    sep=',')
-        if commit:
+        with self.__connection.cursor() as cursor:
+            cursor.copy_from(sio, table, sep='\t', null='None', columns=df.columns)
             self.commit()
 
     def is_file_done(name):
