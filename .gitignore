@@ -4,4 +4,4 @@ boursorama/
 docker/analyzer/*
 docker/dashboard/*
 .vscode/
-.metals/
+analyzer/__pycache__/
