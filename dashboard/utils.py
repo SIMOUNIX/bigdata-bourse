@@ -128,7 +128,8 @@ def get_start_end_dates_for_selected_companies(cids):
         pd.DataFrame: the start and end dates
     """
     if not cids:
-        return pd.DataFrame({"start_date": pd.Timestamp.now(), "end_date": pd.Timestamp.now()})
+        start_date = end_date = pd.Timestamp.now()
+        return pd.DataFrame({"start_date": [start_date], "end_date": [end_date]})
     
     # format cids into a string
     cids_str = ','.join(str(cid) for cid in cids)
@@ -352,7 +353,17 @@ def build_raw_data_content():
     return html.Div(
         [
             selector_div,
-            html.Div([dash_table.DataTable(id="raw-data-table")], 
+            html.Div([dash_table.DataTable(id="raw-data-table",
+                                           style_table={"overflowX": "auto"},
+                                           style_cell={"textAlign": "center"},
+                                           style_header={"backgroundColor": "rgb(230, 230, 230)", "fontWeight": "bold"},
+                                           style_data_conditional=[{"if": {"row_index": "odd"}, "backgroundColor": "rgb(248, 248, 248)"}],
+                                           style_as_list_view=True,
+                                           sort_action="native",
+                                           page_size=15,
+                                           page_current=0,
+                                           page_action="native",
+                                           sort_mode="multi",)],
                      className="main-content-children"),
             html.Div(id="raw-data-debug",
                         className="main-content-children",

@@ -413,6 +413,15 @@ def update_raw_data_table(companies_ids, start_date, end_date):
 
     df = get_multiple_daystocks(companies_list, start_date, end_date)
     
+    # format the date column: yyyy/mm/dd   
+    df["date"] = df["date"].dt.strftime("%Y/%m/%d")
+
+    # add company name column
+    df["name"] = df["cid"].apply(get_company_name)
+    
+    # reorder columns
+    df = df[["date", "name", "open", "close", "high", "low", "volume"]] # include cid?
+    
     # order by date
     df = df.sort_values("date")
     
