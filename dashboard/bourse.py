@@ -7,9 +7,9 @@ import plotly.graph_objects as go
 from datetime import date
 
 from utils import (
-    get_markets,
     get_companies,
     create_companies_options,
+    get_company_name,
     get_daystocks,
     get_multiple_daystocks,
     generate_menu_buttons,
@@ -17,6 +17,7 @@ from utils import (
     build_candlestick_content,
     get_start_end_dates_for_company,
     get_start_end_dates_for_selected_companies,
+    build_raw_data_content
 )
 
 external_stylesheets = [
@@ -145,7 +146,7 @@ def get_page_content(
         content = build_bollinger_content()
         active_button_id = id_bollinger_bands
     elif button_id == "btn-raw-data":
-        content = "Raw Data Content"
+        content = build_raw_data_content()
         active_button_id = id_raw_data
     else:
         content = "Select an option from the menu"
@@ -225,7 +226,7 @@ def update_bollinger_graph(company_id, start_date, end_date):
     fig.add_trace(go.Scatter(x=df["date"], y=df["lower_band"], mode="lines", name="Lower Band"))
 
     # update title
-    fig.update_layout(title_text=f"Bollinger Bands for {company_id}", title_x=0.5)
+    fig.update_layout(title_text=f"Bollinger Bands for {get_company_name(company_id)}", title_x=0.5)
 
     # update layout with axis titles, legend, etc.
     fig.update_layout(
@@ -317,6 +318,11 @@ def update_candlestick_graph(companies_ids, start_date, end_date):
     # order by date
     df = df.sort_values("date")
     
+    # add different color for each company
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+    for i, company_id in enumerate(companies_list):
+        df.loc[df["cid"] == company_id, "color"] = colors[i]
+    
     fig = go.Figure()
     for company_id in companies_list:
         company_df = df[df["cid"] == company_id]
@@ -326,10 +332,9 @@ def update_candlestick_graph(companies_ids, start_date, end_date):
             high=company_df["high"],
             low=company_df["low"],
             close=company_df["close"],
-            name=company_id,
-            increasing_line_color="#00CC96",
-            decreasing_line_color="#EF553B",
-            line=dict(width=1),
+            name=get_company_name(company_id),
+            increasing_line_color=company_df["color"].iloc[0],
+            decreasing_line_color=lighten_color(company_df["color"].iloc[0]),
         ))
         
     fig.update_layout(
@@ -355,82 +360,6 @@ def update_candlestick_graph(companies_ids, start_date, end_date):
     
     return fig
 
-
-# @app.callback(    
-#     Output("candlestick-graph", "figure"),
-#     [
-#         Input("candlestick-selector", "value"),
-#         Input("date-picker", "start_date"),
-#         Input("date-picker", "end_date"),
-#     ],
-# )
-# def update_candlestick_graph(selected_markets, start_date, end_date):
-#     if not selected_markets:
-#         return {}
-
-#     dfs = generate_data_for_selected_markets(selected_markets)
-
-#     fig = go.Figure()
-#     for df, color in dfs:
-#         filtered_df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
-#         decreasing_color = lighten_color(color)
-#         fig.add_trace(
-#             go.Candlestick(
-#                 x=filtered_df["Date"],
-#                 open=filtered_df["Open"],
-#                 high=filtered_df["High"],
-#                 low=filtered_df["Low"],
-#                 close=filtered_df["Close"],
-#                 name=filtered_df["Market"].iloc[0],
-#                 increasing_line_color=color,
-#                 decreasing_line_color=decreasing_color,
-#                 line=dict(width=1),  # Customize candlestick width
-#             )
-#         )
-
-#     fig.update_layout(
-#         title="Candlestick Chart",
-#         xaxis_title="Date",
-#         yaxis_title="Price",
-#         plot_bgcolor="white",  # Set plot background color
-#         font=dict(family="Arial", size=12),
-#         margin=dict(l=50, r=50, t=80, b=50),  # Adjust margins
-#         hovermode="x",
-#         showlegend=True,
-#         legend=dict(
-#             font=dict(family="Arial", size=10),
-#             orientation="h",
-#             yanchor="bottom",
-#             y=1.02,
-#             xanchor="right",
-#             x=1,
-#         ),
-#         xaxis=dict(gridcolor="lightgrey"),  # Customize grid lines
-#         yaxis=dict(gridcolor="lightgrey"),  # Customize grid lines
-#     )
-
-#     return fig
-
-
-# def generate_data_for_selected_markets(selected_markets):
-#     dfs = []
-#     colors = {"Market 1": "#636EFA", "Market 2": "#EF553B", "Market 3": "#00CC96"}
-
-#     for market in selected_markets:
-#         if market == "Market 1":
-#             df = generate_data_candlestick(100)
-#             df["Market"] = "Market 1"
-#         elif market == "Market 2":
-#             df = generate_data_candlestick(100)
-#             df["Market"] = "Market 2"
-#         elif market == "Market 3":
-#             df = generate_data_candlestick(100)
-#             df["Market"] = "Market 3"
-#         dfs.append((df, colors[market]))
-
-#     return dfs
-
-
 def lighten_color(color, factor=0.5):
     """Lighten the given color."""
     color = color.lstrip("#")
@@ -438,6 +367,58 @@ def lighten_color(color, factor=0.5):
     lightened_rgb = tuple(int((255 - c) * factor + c) for c in rgb)
     lightened_color = "#{:02x}{:02x}{:02x}".format(*lightened_rgb)
     return lightened_color
+
+# ------------------ End Candlestick Chart ----------------
+
+@app.callback(
+    Output("company-selector-raw-data", "options"),
+    Output("company-selector-raw-data", "value"),
+    Input("market-selector-raw-data", "value"),
+)
+def update_raw_data_companies(market_id):
+    companies = get_companies(market_id)
+    companies_options = create_companies_options(companies)
+    
+    # set default value to the first company
+    default_company = [companies_options[0]["value"]]
+    
+    return companies_options, default_company
+
+@app.callback(
+    Output("date-picker-raw-data", "start_date"),
+    Output("date-picker-raw-data", "end_date"),
+    Output("raw-data-debug", "children"),
+    Input("company-selector-raw-data", "value"),
+    State("raw-data-debug", "children"),
+)
+def update_raw_data_date_range(companies_ids, old_debug_info):
+    companies_list = list(companies_ids)
+    
+    start_date, end_date = get_start_end_dates_for_selected_companies(companies_list).values[0]
+    # add the selected companies to the debug info
+    debug_info = old_debug_info + [html.Div(f"Companies selected: {companies_list}")]
+    return start_date, end_date, debug_info
+
+@app.callback(
+    Output("raw-data-table", "data"),
+    Input("company-selector-raw-data", "value"),
+    Input("date-picker-raw-data", "start_date"),
+    Input("date-picker-raw-data", "end_date"),
+)
+def update_raw_data_table(companies_ids, start_date, end_date):
+    companies_list = list(companies_ids)
+
+    if not companies_list:
+        return []    
+
+    df = get_multiple_daystocks(companies_list, start_date, end_date)
+    
+    # order by date
+    df = df.sort_values("date")
+    
+    return df.to_dict("records")
+
+# ------------------ Raw Data -----------------------------
 
 
 if __name__ == "__main__":

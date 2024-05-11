@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from dash import dcc, html
+from dash import dcc, html, dash_table
 import plotly.graph_objects as go
 import sqlalchemy
 
@@ -79,6 +79,18 @@ def create_companies_options(companies_df):
     companies_options = sorted(companies_options, key=lambda x: x["label"])
     return companies_options
 
+def get_company_name(cid):
+    """function to get the name of a company
+
+    Args:
+        cid (int): company id
+
+    Returns:
+        str: company name
+    """
+    query = f"SELECT name FROM companies WHERE id = '{cid}'"
+    df = pd.read_sql(query, engine)
+    return df["name"].values[0]
 
 def get_daystocks(cid, start_date, end_date):
     """
@@ -281,6 +293,68 @@ def build_candlestick_content():
             dcc.Graph(id="candlestick-graph",
                       className="main-content-children"),
             html.Div(id="candlestick-debug",
+                        className="main-content-children",
+                        children=["Debug info"]),
+        ]
+    )
+
+def build_raw_data_content():
+    """function to build the initial content of the Raw Data page
+
+    Returns:
+        html.Div: the initial content of the Raw Data page
+    """
+    # get markets
+    markets = get_markets()
+    markets_options = create_markets_options(markets)
+
+    # dropdown to select market
+    market_selector = dcc.Dropdown(
+        id="market-selector-raw-data",
+        options=markets_options,
+        value=markets_options[0]["value"],
+        style={"width": "50%"},
+        clearable=False,
+        multi=False
+    )
+
+    # get companies
+    companies = get_companies(market_selector.value)
+    companies_options = create_companies_options(companies)
+
+    # companies selector
+    # we can select multiple companies
+    # we can remove selected companies
+    company_selector = dcc.Dropdown(
+        id="company-selector-raw-data",
+        options=companies_options,
+        value=[companies_options[0]["value"]],
+        style={"width": "50%"},
+        placeholder="Séléctionner une ou plusieurs entreprises",
+        clearable=True,
+        multi=True,
+    )
+
+    # instantiate the date picker with the today date
+    start_date, end_date = get_start_end_dates_for_company(companies_options[0]["value"]).values[0]
+    
+    date_picker = dcc.DatePickerRange(
+        id="date-picker-raw-data",
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    selector_div = html.Div(
+        [market_selector, company_selector, date_picker],
+        className="selector-div main-content-children"
+    )
+
+    return html.Div(
+        [
+            selector_div,
+            html.Div([dash_table.DataTable(id="raw-data-table")], 
+                     className="main-content-children"),
+            html.Div(id="raw-data-debug",
                         className="main-content-children",
                         children=["Debug info"]),
         ]
