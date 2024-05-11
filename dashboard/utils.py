@@ -29,6 +29,23 @@ def get_markets():
 
     return df
 
+def create_markets_options(markets_df):
+    """function to create markets options for dropdown
+
+    Args:
+        markets_df (pd.DataFrame): markets
+
+    Returns:
+        list[dict]: markets options
+    """
+    markets_options = []
+    for index, market in markets_df.iterrows():
+        markets_options.append(
+            {"label": market["name"], "value": market["mid"]}
+        )
+    
+    return markets_options
+
 
 def get_companies(mid):
     """function to get all companies from a market
@@ -83,7 +100,11 @@ def get_multiple_daystocks(cids, start_date, end_date):
     Returns:
         pd.DatFrame: daystocks
     """
-    query = f"SELECT * FROM daystocks WHERE cid IN {cids} AND date >= '{start_date}' AND date <= '{end_date}'"  # tuple(cids) to avoid SQL injection
+    
+    cids_str = ','.join(str(cid) for cid in cids)
+    
+    # select all daystocks from the selected companies between the start and end dates
+    query = f"SELECT * FROM daystocks WHERE cid IN ({cids_str}) AND date >= '{start_date}' AND date <= '{end_date}'"
     df = pd.read_sql(query, engine)
     return df
 
@@ -94,11 +115,15 @@ def get_start_end_dates_for_selected_companies(cids):
     Returns:
         pd.DataFrame: the start and end dates
     """
-    if len(cids) == 0:
+    if not cids:
         return pd.DataFrame({"start_date": pd.Timestamp.now(), "end_date": pd.Timestamp.now()})
     
-    query = f"SELECT MIN(date) as start_date, MAX(date) as end_date FROM daystocks WHERE cid IN {cids}"
-    df = pd.read_sql(query, engine)
+    # format cids into a string
+    cids_str = ','.join(str(cid) for cid in cids)
+
+    # use parameterized query to avoid SQL injection
+    query = "SELECT MIN(date) as start_date, MAX(date) as end_date FROM daystocks WHERE cid IN (%s)"
+    df = pd.read_sql_query(query % cids_str, engine)
     return df
 
 def get_start_end_dates_for_company(cid):
@@ -144,11 +169,8 @@ def build_bollinger_content():
     """
     # get markets
     markets = get_markets()
+    markets_options = create_markets_options(markets)
     
-    markets_options = []
-    for index, market in markets.iterrows():
-        markets_options.append({"label": market["name"], "value": market["mid"]})
-
     # dropdown to select market
     market_selector = dcc.Dropdown(
         id="market-selector-bollinger",
@@ -202,7 +224,6 @@ def build_bollinger_content():
         ]
     )
 
-
 def build_candlestick_content():
     """function to build the initial content of the Candlestick page
 
@@ -211,58 +232,47 @@ def build_candlestick_content():
     """
     # get markets
     markets = get_markets()
+    markets_options = create_markets_options(markets)
 
     # dropdown to select market
     market_selector = dcc.Dropdown(
-        id="market-selector",
-        options=[
-            {"label": market["name"], "value": market["mid"]}
-            for index, market in markets.iterrows()
-        ],
-        value=markets["mid"].iloc[0],
+        id="market-selector-candlestick",
+        options=markets_options,
+        value=markets_options[0]["value"],
         style={"width": "50%"},
+        clearable=False,
+        multi=False
     )
 
     # get companies
     companies = get_companies(market_selector.value)
+    companies_options = create_companies_options(companies)
 
     # companies selector
-    # search bar to filter companies and can select multiple companies
-    # use DataList
+    # we can select multiple companies
     # we can remove selected companies
-    company_selector = html.Div([
-        html.Datalist(
-            id="company-selector",
-            children=[html.Option(value=company["id"], label=company["name"])
-                      for index, company in companies.iterrows()]
-        ),
-        dcc.Input(
-            id="company-input",
-            list="company-selector",
-            value=''
-        ),
-        # add section to display selected companies and remove them
-        html.Div(id="selected-companies")]
+    company_selector = dcc.Dropdown(
+        id="company-selector-candlestick",
+        options=companies_options,
+        value=[companies_options[0]["value"]],
+        style={"width": "50%"},
+        placeholder="Séléctionner une ou plusieurs entreprises",
+        clearable=True,
+        multi=True,
     )
 
-    # if company is selected
-    # get start and end dates
-    start_date, end_date = get_start_end_dates_for_selected_companies(
-        companies["id"].tolist()).values[0]  # initial dates init with the first company
-
-    # if no company is selected
-    if start_date is None:
-        start_date = end_date = pd.Timestamp.now()
-
+    # instantiate the date picker with the today date
+    start_date, end_date = get_start_end_dates_for_company(companies_options[0]["value"]).values[0]
+    
     date_picker = dcc.DatePickerRange(
-        id="date-picker",
+        id="date-picker-candlestick",
         start_date=start_date,
         end_date=end_date,
     )
 
     selector_div = html.Div(
-        [market_selector, company_selector,
-            date_picker], className="selector-div main-content-children"
+        [market_selector, company_selector, date_picker],
+        className="selector-div main-content-children"
     )
 
     return html.Div(
@@ -270,5 +280,8 @@ def build_candlestick_content():
             selector_div,
             dcc.Graph(id="candlestick-graph",
                       className="main-content-children"),
+            html.Div(id="candlestick-debug",
+                        className="main-content-children",
+                        children=["Debug info"]),
         ]
     )

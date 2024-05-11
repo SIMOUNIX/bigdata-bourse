@@ -11,10 +11,12 @@ from utils import (
     get_companies,
     create_companies_options,
     get_daystocks,
+    get_multiple_daystocks,
     generate_menu_buttons,
     build_bollinger_content,
     build_candlestick_content,
-    get_start_end_dates_for_company
+    get_start_end_dates_for_company,
+    get_start_end_dates_for_selected_companies,
 )
 
 external_stylesheets = [
@@ -190,18 +192,11 @@ def update_bollinger_companies(market_id, old_debug_info):
 @app.callback(
     Output("date-picker-bollinger", "start_date"),
     Output("date-picker-bollinger", "end_date"),
-    # Output("bollinger-debug", "children"),
     Input("company-selector-bollinger", "value"),
-    # State("bollinger-debug", "children")
 )
 def update_bollinger_date_range(company_id):
     start_date, end_date = get_start_end_dates_for_company(company_id).values[0]
-    
-    # # update debug info
-    # debug_message = f"Company {company_id} selected"
-    # debug_info = old_debug_info + [html.Div(debug_message)]
-    
-    return start_date, end_date#, debug_info
+    return start_date, end_date
 
 @app.callback(
     Output("bollinger-graph", "figure"),
@@ -272,8 +267,96 @@ def update_bollinger_graph(company_id, start_date, end_date):
 
     return fig
     
+# ------------------ End Bollinger Bands ------------------
 
-# @app.callback(
+# ------------------ Candlestick Chart --------------------
+
+@app.callback(
+    Output("company-selector-candlestick", "options"),
+    Output("company-selector-candlestick", "value"),
+    Input("market-selector-candlestick", "value"),
+)
+def update_candlestick_companies(market_id):
+    companies = get_companies(market_id)
+    companies_options = create_companies_options(companies)
+    
+    # set default value to the first company
+    default_company = [companies_options[0]["value"]]
+    
+    return companies_options, default_company
+
+@app.callback(
+    Output("date-picker-candlestick", "start_date"),
+    Output("date-picker-candlestick", "end_date"),
+    Output("candlestick-debug", "children"),
+    Input("company-selector-candlestick", "value"),
+    State("candlestick-debug", "children"),
+)
+def update_candlestick_date_range(companies_ids, old_debug_info):
+    companies_list = list(companies_ids)
+    
+    start_date, end_date = get_start_end_dates_for_selected_companies(companies_list).values[0]
+    # add the selected companies to the debug info
+    debug_info = old_debug_info + [html.Div(f"Companies selected: {companies_list}")]
+    return start_date, end_date, debug_info
+
+@app.callback(
+    Output("candlestick-graph", "figure"),
+    Input("company-selector-candlestick", "value"),
+    Input("date-picker-candlestick", "start_date"),
+    Input("date-picker-candlestick", "end_date"),
+)
+def update_candlestick_graph(companies_ids, start_date, end_date):
+    companies_list = list(companies_ids)
+
+    if not companies_list:
+        return {}    
+
+    df = get_multiple_daystocks(companies_list, start_date, end_date)
+    
+    # order by date
+    df = df.sort_values("date")
+    
+    fig = go.Figure()
+    for company_id in companies_list:
+        company_df = df[df["cid"] == company_id]
+        fig.add_trace(go.Candlestick(
+            x=company_df["date"],
+            open=company_df["open"],
+            high=company_df["high"],
+            low=company_df["low"],
+            close=company_df["close"],
+            name=company_id,
+            increasing_line_color="#00CC96",
+            decreasing_line_color="#EF553B",
+            line=dict(width=1),
+        ))
+        
+    fig.update_layout(
+        title="Candlestick Chart",
+        xaxis_title="Date",
+        yaxis_title="Price",
+        plot_bgcolor="white",
+        font=dict(family="Arial", size=12),
+        margin=dict(l=50, r=50, t=80, b=50),
+        hovermode="x",
+        showlegend=True,
+        legend=dict(
+            font=dict(family="Arial", size=10),
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+        ),
+        xaxis=dict(gridcolor="lightgrey"),
+        yaxis=dict(gridcolor="lightgrey"),
+    )
+    
+    return fig
+
+
+# @app.callback(    
 #     Output("candlestick-graph", "figure"),
 #     [
 #         Input("candlestick-selector", "value"),
