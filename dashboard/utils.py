@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from dash import dcc, html
+from dash import dcc, html, dash_table
 import plotly.graph_objects as go
 import sqlalchemy
 
@@ -29,6 +29,23 @@ def get_markets():
 
     return df
 
+def create_markets_options(markets_df):
+    """function to create markets options for dropdown
+
+    Args:
+        markets_df (pd.DataFrame): markets
+
+    Returns:
+        list[dict]: markets options
+    """
+    markets_options = []
+    for index, market in markets_df.iterrows():
+        markets_options.append(
+            {"label": market["name"], "value": market["mid"]}
+        )
+    
+    return markets_options
+
 
 def get_companies(mid):
     """function to get all companies from a market
@@ -43,6 +60,37 @@ def get_companies(mid):
     df = pd.read_sql(query, engine)
     return df
 
+def create_companies_options(companies_df):
+    """function to create companies options for dropdown
+
+    Args:
+        companies_df (pd.DataFrame): companies
+
+    Returns:
+        list[dict]: companies options
+    """
+    companies_options = []
+    for index, company in companies_df.iterrows():
+        companies_options.append(
+            {"label": company["name"], "value": company["id"]}
+        )
+        
+    # sort companies by label
+    companies_options = sorted(companies_options, key=lambda x: x["label"])
+    return companies_options
+
+def get_company_name(cid):
+    """function to get the name of a company
+
+    Args:
+        cid (int): company id
+
+    Returns:
+        str: company name
+    """
+    query = f"SELECT name FROM companies WHERE id = '{cid}'"
+    df = pd.read_sql(query, engine)
+    return df["name"].values[0]
 
 def get_daystocks(cid, start_date, end_date):
     """
@@ -64,7 +112,11 @@ def get_multiple_daystocks(cids, start_date, end_date):
     Returns:
         pd.DatFrame: daystocks
     """
-    query = f"SELECT * FROM daystocks WHERE cid IN {tuple(cids)} AND date >= '{start_date}' AND date <= '{end_date}'"  # tuple(cids) to avoid SQL injection
+    
+    cids_str = ','.join(str(cid) for cid in cids)
+    
+    # select all daystocks from the selected companies between the start and end dates
+    query = f"SELECT * FROM daystocks WHERE cid IN ({cids_str}) AND date >= '{start_date}' AND date <= '{end_date}'"
     df = pd.read_sql(query, engine)
     return df
 
@@ -75,52 +127,27 @@ def get_start_end_dates_for_selected_companies(cids):
     Returns:
         pd.DataFrame: the start and end dates
     """
-    query = f"SELECT MIN(date) as start_date, MAX(date) as end_date FROM daystocks WHERE cid IN {tuple(cids)}"
+    if not cids:
+        start_date = end_date = pd.Timestamp.now()
+        return pd.DataFrame({"start_date": [start_date], "end_date": [end_date]})
+    
+    # format cids into a string
+    cids_str = ','.join(str(cid) for cid in cids)
+
+    # use parameterized query to avoid SQL injection
+    query = "SELECT MIN(date) as start_date, MAX(date) as end_date FROM daystocks WHERE cid IN (%s)"
+    df = pd.read_sql_query(query % cids_str, engine)
+    return df
+
+def get_start_end_dates_for_company(cid):
+    """function to get the start and end dates of the daystocks table for a company
+
+    Returns:
+        pd.DataFrame: the start and end dates
+    """
+    query = f"SELECT MIN(date) as start_date, MAX(date) as end_date FROM daystocks WHERE cid = '{cid}'"
     df = pd.read_sql(query, engine)
     return df
-
-
-def generate_random_data(num_days, volatility, trend, noise_level):
-    window_size = 20
-    dates = pd.date_range(start="2024-01-01", periods=num_days)
-    prices = np.cumsum(np.random.randn(num_days) * volatility) + trend
-
-    rolling_mean = pd.Series(prices).rolling(window=window_size).mean()
-    rolling_std = pd.Series(prices).rolling(window=window_size).std()
-
-    # Calculate upper and lower Bollinger Bands
-    upper_band = rolling_mean + 2 * rolling_std
-    lower_band = rolling_mean - 2 * rolling_std
-
-    # Add noise
-    prices += np.random.randn(num_days) * noise_level
-
-    # Create DataFrame
-    data = {
-        "Date": dates,
-        "Close": prices,
-        "SMA": rolling_mean,
-        "UB": upper_band,
-        "LB": lower_band,
-    }
-    df = pd.DataFrame(data)
-    return df
-
-
-def generate_data_candlestick(num_days):
-    dates = pd.date_range(start="2024-01-01", periods=num_days)
-    prices = np.cumsum(np.random.randn(num_days))
-
-    data = {
-        "Date": dates,
-        "Open": prices,
-        "High": prices + np.random.rand(num_days),
-        "Low": prices - np.random.rand(num_days),
-        "Close": prices + np.random.randn(num_days),
-    }
-    df = pd.DataFrame(data)
-    return df
-
 
 def generate_menu_buttons(active_button_id):
     menu_buttons = [
@@ -155,62 +182,60 @@ def build_bollinger_content():
     """
     # get markets
     markets = get_markets()
-
+    markets_options = create_markets_options(markets)
+    
     # dropdown to select market
     market_selector = dcc.Dropdown(
-        id="market-selector",
-        options=[
-            {"label": market["name"], "value": market["mid"]}
-            for index, market in markets.iterrows()
-        ],
-        value=markets["mid"].iloc[0],
+        id="market-selector-bollinger",
+        options=markets_options,
+        value=markets_options[0]["value"],
         style={"width": "50%"},
+        placeholder="Séléctionner un marché",
+        clearable=False,
+        multi=False
     )
 
     # get companies
     companies = get_companies(market_selector.value)
-
+    companies_options = create_companies_options(companies)  
+    
     # companies selector
     # search bar to filter companies and select only one at a time
-    # use DataList
-    company_selector = html.Div([
-        html.Datalist(
-            id="company-selector",
-            children=[html.Option(value=company["cid"], label=company["name"])
-                      for index, company in companies.iterrows()]
-        ),
-        dcc.Input(
-            id="company-input",
-            list="company-selector",
-            value=''
-        )]
+    company_selector = dcc.Dropdown(
+        id="company-selector-bollinger",
+        options=companies_options,
+        value=companies_options[0]["value"],
+        style={"width": "50%"},
+        placeholder="Séléctionner une entreprise",
+        clearable=False,
+        multi=False
     )
 
-    # get start and end dates
-    start_date, end_date = get_start_end_dates_for_selected_companies(
-        companies["cid"].tolist()).values[0]  # initial dates init with the first company
-    # TODO: still have to check if the dates are correct
+    # instantiate the date picker with the start and end dates of the selected company
+    start_date, end_date = get_start_end_dates_for_company(companies_options[0]["value"]).values[0]
 
     # date selector
     date_picker = dcc.DatePickerRange(
-        id="date-picker",
+        id="date-picker-bollinger",
         start_date=start_date,
         end_date=end_date,
         minimum_nights=20,  # Minimum number of nights between start and end date, 20 because we need information for the Bollinger Bands
     )
 
     selector_div = html.Div(
-        [market_selector, company_selector,
-            date_picker], className="selector-div main-content-children"
+        [market_selector, company_selector,date_picker], 
+        className="selector-div main-content-children"
     )
 
     return html.Div(
         [
             selector_div,
             dcc.Graph(id="bollinger-graph", className="main-content-children"),
+            html.Div(id="bollinger-debug",
+                     className="main-content-children",
+                     children=["Debug info"]),
         ]
     )
-
 
 def build_candlestick_content():
     """function to build the initial content of the Candlestick page
@@ -220,53 +245,47 @@ def build_candlestick_content():
     """
     # get markets
     markets = get_markets()
+    markets_options = create_markets_options(markets)
 
     # dropdown to select market
     market_selector = dcc.Dropdown(
-        id="market-selector",
-        options=[
-            {"label": market["name"], "value": market["mid"]}
-            for index, market in markets.iterrows()
-        ],
-        value=markets["mid"].iloc[0],
+        id="market-selector-candlestick",
+        options=markets_options,
+        value=markets_options[0]["value"],
         style={"width": "50%"},
+        clearable=False,
+        multi=False
     )
 
     # get companies
     companies = get_companies(market_selector.value)
+    companies_options = create_companies_options(companies)
 
     # companies selector
-    # search bar to filter companies and can select multiple companies
-    # use DataList
+    # we can select multiple companies
     # we can remove selected companies
-    company_selector = html.Div([
-        html.Datalist(
-            id="company-selector",
-            children=[html.Option(value=company["cid"], label=company["name"])
-                      for index, company in companies.iterrows()]
-        ),
-        dcc.Input(
-            id="company-input",
-            list="company-selector",
-            value=''
-        ),
-        # add section to display selected companies and remove them
-        html.Div(id="selected-companies")]
+    company_selector = dcc.Dropdown(
+        id="company-selector-candlestick",
+        options=companies_options,
+        value=[companies_options[0]["value"]],
+        style={"width": "50%"},
+        placeholder="Séléctionner une ou plusieurs entreprises",
+        clearable=True,
+        multi=True,
     )
 
-    # get start and end dates
-    start_date, end_date = get_start_end_dates_for_selected_companies(
-        companies["cid"].tolist()).values[0]  # initial dates init with the first company
-
+    # instantiate the date picker with the today date
+    start_date, end_date = get_start_end_dates_for_company(companies_options[0]["value"]).values[0]
+    
     date_picker = dcc.DatePickerRange(
-        id="date-picker",
+        id="date-picker-candlestick",
         start_date=start_date,
         end_date=end_date,
     )
 
     selector_div = html.Div(
-        [market_selector, company_selector,
-            date_picker], className="selector-div main-content-children"
+        [market_selector, company_selector, date_picker],
+        className="selector-div main-content-children"
     )
 
     return html.Div(
@@ -274,5 +293,80 @@ def build_candlestick_content():
             selector_div,
             dcc.Graph(id="candlestick-graph",
                       className="main-content-children"),
+            html.Div(id="candlestick-debug",
+                        className="main-content-children",
+                        children=["Debug info"]),
+        ]
+    )
+
+def build_raw_data_content():
+    """function to build the initial content of the Raw Data page
+
+    Returns:
+        html.Div: the initial content of the Raw Data page
+    """
+    # get markets
+    markets = get_markets()
+    markets_options = create_markets_options(markets)
+
+    # dropdown to select market
+    market_selector = dcc.Dropdown(
+        id="market-selector-raw-data",
+        options=markets_options,
+        value=markets_options[0]["value"],
+        style={"width": "50%"},
+        clearable=False,
+        multi=False
+    )
+
+    # get companies
+    companies = get_companies(market_selector.value)
+    companies_options = create_companies_options(companies)
+
+    # companies selector
+    # we can select multiple companies
+    # we can remove selected companies
+    company_selector = dcc.Dropdown(
+        id="company-selector-raw-data",
+        options=companies_options,
+        value=[companies_options[0]["value"]],
+        style={"width": "50%"},
+        placeholder="Séléctionner une ou plusieurs entreprises",
+        clearable=True,
+        multi=True,
+    )
+
+    # instantiate the date picker with the today date
+    start_date, end_date = get_start_end_dates_for_company(companies_options[0]["value"]).values[0]
+    
+    date_picker = dcc.DatePickerRange(
+        id="date-picker-raw-data",
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    selector_div = html.Div(
+        [market_selector, company_selector, date_picker],
+        className="selector-div main-content-children"
+    )
+
+    return html.Div(
+        [
+            selector_div,
+            html.Div([dash_table.DataTable(id="raw-data-table",
+                                           style_table={"overflowX": "auto"},
+                                           style_cell={"textAlign": "center"},
+                                           style_header={"backgroundColor": "rgb(230, 230, 230)", "fontWeight": "bold"},
+                                           style_data_conditional=[{"if": {"row_index": "odd"}, "backgroundColor": "rgb(248, 248, 248)"}],
+                                           style_as_list_view=True,
+                                           sort_action="native",
+                                           page_size=15,
+                                           page_current=0,
+                                           page_action="native",
+                                           sort_mode="multi",)],
+                     className="main-content-children"),
+            html.Div(id="raw-data-debug",
+                        className="main-content-children",
+                        children=["Debug info"]),
         ]
     )

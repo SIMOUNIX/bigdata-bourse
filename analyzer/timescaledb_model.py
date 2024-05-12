@@ -235,11 +235,6 @@ class TimescaleStockMarketModel:
             return [r[0] for r in res]
         else:
             return 0
-        
-    def search_company_id_with_symbol(self, symbol, getmax=1, strict=False, market=None, name=None, pea=None):
-        # find the id of a company in our database using the symbol
-        pass
-    
 
     def df_write_optimized(self, df, table, commit=False):
         sio = StringIO()
@@ -247,7 +242,8 @@ class TimescaleStockMarketModel:
         sio.seek(0)
         with self.__connection.cursor() as cursor:
             cursor.copy_from(sio, table, sep='\t', null='None', columns=df.columns)
-            self.commit()
+            if commit:
+                self.commit()
 
     def is_file_done(name):
         '''
