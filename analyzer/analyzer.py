@@ -139,7 +139,7 @@ def feed_stocks(path_df, mid):
         
         db.df_write_optimized(merged_df, table="stocks")
         db.commit()
-        db.execute('''INSERT INTO file_done VALUES (%s)''', file[0])
+        db.execute('''INSERT INTO file_done VALUES (%s)''', (file[0],))
         db.commit()
         
     end_time = time.time()
@@ -161,7 +161,6 @@ def feed_daystocks():
             MIN(value) AS low,
             MAX(volume) AS volume
         FROM STOCKS s
-        WHERE cid != 0
         GROUP BY date::date, cid;        ;
         ''')
     db.commit()
@@ -170,7 +169,13 @@ def feed_daystocks():
     elapsed_time = end_time - start_time
     print(f"feed_daystocks: Execution time: {elapsed_time:.6f} seconds")
 
-def filter_seen_paths(dfs, seen_files):
+def filter_seen_paths(dfs):
+    # remove the files from file_done
+    seen_files = db.df_query('SELECT * FROM file_done')
+    seen_files = [file for file in seen_files]
+    seen_files = seen_files[0] # columns: name
+    seen_files = set(seen_files['name'])
+    
     for df in dfs:
         df = df[~df['path'].isin(seen_files)]
     return dfs
@@ -184,15 +189,10 @@ if __name__ == '__main__':
 
     # df_compA, df_compB, df_amsterdam, df_peapme = create_path_df()
     
-    # # remove the files from file_done
-    # seen_files = db.df_query('SELECT * FROM file_done')
-    # seen_files = [file for file in seen_files]
-    # seen_files = seen_files[0] # columns: name
-    # seen_files = set(seen_files['name'])
-    
-    # dfs = [df_compA, df_compB, df_amsterdam, df_peapme]
-    # dfs = filter_seen_paths(dfs, seen_files) # removes files that have already been processed
-    # df_compA, df_compB, df_amsterdam, df_peapme = dfs
+    # removes files that have already been processed
+    # df_compA, df_compB, df_amsterdam, df_peapme = filter_seen_paths([
+    #     df_compA, df_compB, df_amsterdam, df_peapme
+    # ])
     
     # feed_companies(df_compA, 7)
     # feed_companies(df_compB, 8)
