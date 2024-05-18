@@ -17,7 +17,8 @@ from utils import (
     build_candlestick_content,
     get_start_end_dates_for_company,
     get_start_end_dates_for_selected_companies,
-    build_raw_data_content
+    build_raw_data_content,
+    build_dashboard_overview,
 )
 
 external_stylesheets = [
@@ -125,19 +126,7 @@ def get_page_content(
     button_id, id_home, id_share_price, id_bollinger_bands, id_raw_data
 ):
     if button_id == "btn-dashboard":
-        content = html.Div([
-                dcc.Textarea(
-                    id='sql-query',
-                    value='''
-                        SELECT * FROM pg_catalog.pg_tables
-                            WHERE schemaname != 'pg_catalog' AND 
-                                  schemaname != 'information_schema';
-                    ''',
-                    style={'width': '100%', 'height': 100},
-                    ),
-                html.Button('Execute', id='execute-query', n_clicks=0),
-                html.Div(id='query-result')
-             ])
+        content = build_dashboard_overview()
         active_button_id = id_home
     elif button_id == "btn-share-price":
         content = build_candlestick_content()

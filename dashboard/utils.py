@@ -149,6 +149,37 @@ def get_start_end_dates_for_company(cid):
     df = pd.read_sql(query, engine)
     return df
 
+def get_high_low_volume_for_every_year():
+    """function to get the highest and lowest volume for every year
+
+    Returns:
+        pd.DataFrame: year linked to the highest and lowest volume and the companies
+    """
+    
+    # get every year in the daystocks table
+    query = "SELECT DISTINCT EXTRACT(year FROM date) as year FROM daystocks"
+    years = pd.read_sql(query, engine)
+    
+    # get the company with the highest and lowest volume for every year
+    df = pd.DataFrame()
+    for year in years["year"]:
+        query = f"""
+            SELECT 
+                '{year}' as year,
+                MAX(volume) as high_volume,
+                MIN(volume) as low_volume,
+                cid
+            FROM daystocks
+            WHERE EXTRACT(year FROM date) = '{year}'
+            GROUP BY cid
+            ORDER BY high_volume DESC
+            LIMIT 1
+        """
+        df = pd.concat([df, pd.read_sql(query, engine)], ignore_index=True)
+        
+    return df
+    
+
 def generate_menu_buttons(active_button_id):
     menu_buttons = [
         html.Button(
@@ -370,3 +401,31 @@ def build_raw_data_content():
                         children=["Debug info"]),
         ]
     )
+    
+def build_dashboard_overview():
+    """function to build the initial content of the Overview page
+
+    Returns:
+        html.Div: the initial content of the Overview page
+    """
+    
+    center_div = html.Div([
+                dcc.Textarea(
+                    id='sql-query',
+                    value='''
+                        SELECT * FROM pg_catalog.pg_tables
+                            WHERE schemaname != 'pg_catalog' AND 
+                                  schemaname != 'information_schema';
+                    ''',
+                    style={'width': '100%', 'height': 300},
+                    ),
+                html.Button('Execute', id='execute-query', n_clicks=0),
+                html.Div(id='query-result')
+             ], style={'textAlign': 'center'}
+                          , className="main-content-children")
+    
+    return html.Div(
+        [
+            html.H1("Overview", className="main-content-children", style={"textAlign": "center"}),
+            center_div
+        ])
