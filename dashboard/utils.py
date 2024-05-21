@@ -96,7 +96,10 @@ def get_daystocks(cid, start_date, end_date):
     """
     Get daystocks from a company between starting and ending dates
     """
-    query = f"SELECT * FROM daystocks WHERE cid = '{cid}' AND date >= '{start_date}' AND date <= '{end_date}'"
+    if start_date is None or end_date is None:
+        query = f"SELECT * FROM daystocks WHERE cid = '{cid}'"
+    else:
+        query = f"SELECT * FROM daystocks WHERE cid = '{cid}' AND date >= '{start_date}' AND date <= '{end_date}'"
     df = pd.read_sql(query, engine)
     return df
 
@@ -149,6 +152,37 @@ def get_start_end_dates_for_company(cid):
     df = pd.read_sql(query, engine)
     return df
 
+def get_high_low_volume_for_every_year():
+    """function to get the highest and lowest volume for every year
+
+    Returns:
+        pd.DataFrame: year linked to the highest and lowest volume and the companies
+    """
+    
+    # get every year in the daystocks table
+    query = "SELECT DISTINCT EXTRACT(year FROM date) as year FROM daystocks"
+    years = pd.read_sql(query, engine)
+    
+    # get the company with the highest and lowest volume for every year
+    df = pd.DataFrame()
+    for year in years["year"]:
+        query = f"""
+            SELECT 
+                '{year}' as year,
+                MAX(volume) as high_volume,
+                MIN(volume) as low_volume,
+                cid
+            FROM daystocks
+            WHERE EXTRACT(year FROM date) = '{year}'
+            GROUP BY cid
+            ORDER BY high_volume DESC
+            LIMIT 1
+        """
+        df = pd.concat([df, pd.read_sql(query, engine)], ignore_index=True)
+        
+    return df
+    
+
 def generate_menu_buttons(active_button_id):
     menu_buttons = [
         html.Button(
@@ -158,13 +192,13 @@ def generate_menu_buttons(active_button_id):
             "Share Price", id="btn-share-price", n_clicks=0, className="btn btn-width"
         ),
         html.Button(
-            "Bollinger Bands",
-            id="btn-bollinger-bands",
-            n_clicks=0,
-            className="btn btn-width",
+            "Bollinger Bands", id="btn-bollinger-bands", n_clicks=0, className="btn btn-width",
         ),
         html.Button(
             "Raw Data", id="btn-raw-data", n_clicks=0, className="btn btn-width"
+        ),
+        html.Button(
+            "YTD", id="btn-sp500-ytd", n_clicks=0, className="btn btn-width"
         ),
     ]
     for button in menu_buttons:
@@ -172,7 +206,6 @@ def generate_menu_buttons(active_button_id):
             button.className += " active"
 
     return menu_buttons
-
 
 def build_bollinger_content():
     """function to build the initial content of the Bollinger Bands page
@@ -189,7 +222,7 @@ def build_bollinger_content():
         id="market-selector-bollinger",
         options=markets_options,
         value=markets_options[0]["value"],
-        style={"width": "50%"},
+        style={"width": "100%"},
         placeholder="Séléctionner un marché",
         clearable=False,
         multi=False
@@ -205,7 +238,7 @@ def build_bollinger_content():
         id="company-selector-bollinger",
         options=companies_options,
         value=companies_options[0]["value"],
-        style={"width": "50%"},
+        style={"width": "100%"},
         placeholder="Séléctionner une entreprise",
         clearable=False,
         multi=False
@@ -252,9 +285,9 @@ def build_candlestick_content():
         id="market-selector-candlestick",
         options=markets_options,
         value=markets_options[0]["value"],
-        style={"width": "50%"},
         clearable=False,
-        multi=False
+        multi=False,
+        className="selector-item"
     )
 
     # get companies
@@ -268,10 +301,23 @@ def build_candlestick_content():
         id="company-selector-candlestick",
         options=companies_options,
         value=[companies_options[0]["value"]],
-        style={"width": "50%"},
         placeholder="Séléctionner une ou plusieurs entreprises",
         clearable=True,
         multi=True,
+        className="selector-item"
+    )
+    
+    # type of graph, either candlestick or line
+    graph_type_selector = dcc.Dropdown(
+        id="graph-type-selector",
+        options=[
+            {"label": "Candlestick", "value": "candlestick"},
+            {"label": "Line", "value": "line"},
+        ],
+        value="candlestick",
+        clearable=False,
+        multi=False,
+        className="selector-item"
     )
 
     # instantiate the date picker with the today date
@@ -281,23 +327,22 @@ def build_candlestick_content():
         id="date-picker-candlestick",
         start_date=start_date,
         end_date=end_date,
+        className="date-picker-item"
     )
 
     selector_div = html.Div(
-        [market_selector, company_selector, date_picker],
-        className="selector-div main-content-children"
+        [market_selector, company_selector, date_picker, graph_type_selector],
+        className="selector-div main-content-children",
     )
 
     return html.Div(
         [
             selector_div,
-            dcc.Graph(id="candlestick-graph",
-                      className="main-content-children"),
-            html.Div(id="candlestick-debug",
-                        className="main-content-children",
-                        children=["Debug info"]),
+            dcc.Graph(id="candlestick-graph", className="main-content-children"),
+            html.Div(id="candlestick-debug", className="main-content-children", children=["Debug info"]),
         ]
     )
+
 
 def build_raw_data_content():
     """function to build the initial content of the Raw Data page
@@ -314,7 +359,7 @@ def build_raw_data_content():
         id="market-selector-raw-data",
         options=markets_options,
         value=markets_options[0]["value"],
-        style={"width": "50%"},
+        style={"width": "100%"},
         clearable=False,
         multi=False
     )
@@ -330,7 +375,7 @@ def build_raw_data_content():
         id="company-selector-raw-data",
         options=companies_options,
         value=[companies_options[0]["value"]],
-        style={"width": "50%"},
+        style={"width": "100%"},
         placeholder="Séléctionner une ou plusieurs entreprises",
         clearable=True,
         multi=True,
@@ -368,5 +413,85 @@ def build_raw_data_content():
             html.Div(id="raw-data-debug",
                         className="main-content-children",
                         children=["Debug info"]),
+        ]
+    )
+    
+def build_dashboard_overview():
+    """function to build the initial content of the Overview page
+
+    Returns:
+        html.Div: the initial content of the Overview page
+    """
+    
+    center_div = html.Div([
+                dcc.Textarea(
+                    id='sql-query',
+                    value='''
+                        SELECT * FROM pg_catalog.pg_tables
+                            WHERE schemaname != 'pg_catalog' AND 
+                                  schemaname != 'information_schema';
+                    ''',
+                    style={'width': '100%', 'height': 300},
+                    ),
+                html.Button('Execute', id='execute-query', n_clicks=0),
+                html.Div(id='query-result')
+             ], style={'textAlign': 'center'}
+                          , className="main-content-children")
+    
+    return html.Div(
+        [
+            html.H1("Overview", className="main-content-children", style={"textAlign": "center"}),
+            center_div
+        ])
+
+def build_sp500_ytd_content():
+    """function to build the initial content of the SP500 YTD page
+    YTD will be displayed for each year we have in the data, first value - last value / first value * 100
+
+    Returns:
+        html.Div: the initial content of the SP500 YTD page
+    """
+    
+    # get markets
+    markets = get_markets()
+    markets_options = create_markets_options(markets)
+
+    # dropdown to select market
+    market_selector = dcc.Dropdown(
+        id="market-selector-sp500-ytd",
+        options=markets_options,
+        value=markets_options[0]["value"],
+        clearable=False,
+        multi=False,
+        className="selector-item"
+    )
+
+    # get companies
+    companies = get_companies(market_selector.value)
+    companies_options = create_companies_options(companies)
+
+    # companies selector
+    # we can select multiple companies
+    # we can remove selected companies
+    company_selector = dcc.Dropdown(
+        id="company-selector-sp500-ytd",
+        options=companies_options,
+        value=companies_options[0]["value"],
+        placeholder="Séléctionner une entreprise",
+        className="selector-item",
+        clearable=False,
+        multi=False
+    )
+    
+    selector_div = html.Div(
+        [market_selector, company_selector],
+        className="selector-div main-content-children",
+    )
+    
+    return html.Div(
+        [
+            selector_div,
+            dcc.Graph(id="sp500-ytd-graph", className="main-content-children"),
+            html.Div(id="sp500-ytd-debug", className="main-content-children", children=["Debug info"]),
         ]
     )
