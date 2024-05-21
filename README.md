@@ -1,5 +1,10 @@
 # Analyzer
 
+L'analyzer se décompose en plusieurs étapes:
+- recensement des fichiers pour chaque année et chaque marche
+- recensement des compagnies en omettant les compagnies qui apparaissent et disparaissent le même jour et insertion des valeurs dans la table correspondante
+- recensement des valeurs de stocks et insertion des valeurs dans la table correspondante après nettoyage
+- remplissage de la table daystocks à partir des valeurs de la table stocks 
 
 # Dashboard
 
