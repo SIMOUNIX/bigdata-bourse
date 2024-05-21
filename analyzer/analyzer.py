@@ -79,44 +79,46 @@ def feed_companies(path_df, mid):
     print(f"feed companies for market {mid} starting...")
     pea = (mid == 1)
     
-    # keep the last index of each day
+    # Keep the last index of each day
     path_df = path_df.resample('D').last()
-    # droping the days with no data -> stock market closed
+    # Drop the days with no data -> stock market closed
     path_df = path_df.dropna()
-    
-    # creating the companies dataframe following the database schema
-    df_output = pd.DataFrame({'name': pd.Series([], dtype='str'),
-        'mid': pd.Series([], dtype='int'), 'symbol': pd.Series([], dtype='str'),
-        'symbol_nf': pd.Series([], dtype='str'), 'isin': pd.Series([], dtype='str'), 
-        'reuters': pd.Series([], dtype='str'), 'boursorama': pd.Series([], dtype='str'), 
-        'pea': pd.Series([], dtype='bool'), 'sector': pd.Series([], dtype='int')
-    })
+
+    # Initialize an empty list to store dataframes
+    dfs = []
     
     for _, file in path_df.iterrows():
-        df = pd.read_pickle(file[0]) # index: symbol - columns: name, symbol, last, volume
-        df.drop(columns=['last', 'volume'], inplace=True) # removing the columns not needed
+        # Read the pickle file
+        df = pd.read_pickle(file['path'])
+        # Drop the columns not needed
+        df.drop(columns=['last', 'volume'], inplace=True)
+        # Append to the list of dataframes
+        dfs.append(df)
         
-        for symbol, row in df.iterrows(): # symbol is the index of the dataframe
-            name = row['name']
-            
-            # checking if the company already exists in the dataframe
-            exisiting_company = df_output[df_output['symbol'] == symbol]
-            
-            if not exisiting_company.empty: # if the company already exists, we update the name if it changed
-                existing_company_name = exisiting_company.iloc[0]['name']
-                if existing_company_name != name:
-                    df_output.loc[df_output['symbol'] == symbol, 'name'] = name
-            else: # if the company does not exist, we add it to the dataframe
-                new_row = {'name': name, 'mid': mid, 'symbol': symbol, 'symbol_nf': '', 'isin': '', 'reuters': '', 'boursorama': '', 'pea': pea, 'sector': 0}
-                df_output = pd.concat([df_output, pd.DataFrame(new_row, index=[0])], ignore_index=True)
-        
+    # Concatenate all dataframes
+    combined_df = pd.concat(dfs)
+    # Remove duplicates, keeping the last occurence of the idnex
+    combined_df = combined_df[~combined_df.index.duplicated(keep='last')]
+    
+    df_output = pd.DataFrame({
+        'name': combined_df['name'],
+        'mid': mid,
+        'symbol': combined_df.index,
+        'symbol_nf': '',
+        'isin': '',
+        'reuters': '',
+        'boursorama': '',
+        'pea': pea,
+        'sector': 0
+    })
+    
     db.df_write_optimized(df_output, table="companies")
     db.commit()
-        
+    
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"feed companies: Execution time: {elapsed_time:.6f} seconds")
-
+    
     
 def feed_stocks(path_df, mid):
     start_time = time.time()
@@ -126,7 +128,7 @@ def feed_stocks(path_df, mid):
         # getting the companies ids and symbols
         cids = db.df_query(f"SELECT id, symbol FROM companies WHERE mid = {mid}") 
         cids = [cid for cid in cids]
-        cids = cids[0] # index: id - columns: symbol
+        cids = pd.concat(cids) # index: id - columns: symbol
         
         # cleaning and formatting the stocks dataframe
         df = clean_df(pd.read_pickle(file[0])) # index: symbol - columns: last, volume
@@ -185,26 +187,26 @@ if __name__ == '__main__':
     start_time = time.time()
     
     # UNCOMMENT THE FOLLOWING LINES TO FEED THE DATABASES
-    # db.clean_all_tables()
+    db.clean_all_tables()
 
-    # df_compA, df_compB, df_amsterdam, df_peapme = create_path_df()
+    df_compA, df_compB, df_amsterdam, df_peapme = create_path_df()
     
-    # removes files that have already been processed
-    # df_compA, df_compB, df_amsterdam, df_peapme = filter_seen_paths([
-    #     df_compA, df_compB, df_amsterdam, df_peapme
-    # ])
+    # # removes files that have already been processed
+    df_compA, df_compB, df_amsterdam, df_peapme = filter_seen_paths([
+        df_compA, df_compB, df_amsterdam, df_peapme
+    ])
     
-    # feed_companies(df_compA, 7)
-    # feed_companies(df_compB, 8)
-    # feed_companies(df_amsterdam, 9)
-    # feed_companies(df_peapme, 1)
+    feed_companies(df_compA, 7)
+    feed_companies(df_compB, 8)
+    feed_companies(df_amsterdam, 6)
+    feed_companies(df_peapme, 1)
     
-    # feed_stocks(df_compA, 7)
-    # feed_stocks(df_compB, 8)
-    # feed_stocks(df_amsterdam, 9)
-    # feed_stocks(df_peapme, 1)
-    
-    # feed_daystocks()
+    feed_stocks(df_compA, 7)
+    feed_stocks(df_compB, 8)
+    feed_stocks(df_amsterdam, 6)
+    feed_stocks(df_peapme, 1)
+
+    feed_daystocks()
     
     end_time = time.time()
     elapsed_time = end_time - start_time
