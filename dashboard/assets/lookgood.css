@@ -61,6 +61,7 @@ body {
     text-transform: none;
     border: none;
 }
+
 /* Style for navbar button text */
 .btn-width {
     width: 100%;
@@ -77,22 +78,17 @@ body {
 
 .vertical-navbar {
     width: 200px; /* Adjust width as needed */
-    /* min-height: 100%; Ensure the navbar is at least as tall as the viewport */
     background-color: var(--background);
     padding: 10px;
     margin: 10px;
     overflow-y: auto; /* Add vertical scrollbar if content exceeds viewport height */
-
     border-radius: 10px;
 }
 
 .main-content {
-    flex: 1; /* Take up remaining space */
-    /* background-color: var(--background); */
-    /* padding: 20px; */
-
-    /* margin: 10px 10px 10px 0; */
-    /* border-radius: 10px; */
+    flex: 1;
+    width: calc(100% - 200px); /* Adjust width as needed */
+    position: relative;
 }
 
 .main-content-children {
@@ -104,7 +100,19 @@ body {
 
 .selector-div {
     display: flex;
-    flex-direction: row;
-    justify-content: space-around;
+    flex-wrap: wrap;  /* Allows items to wrap to the next line */
+    justify-content: space-between;  /* Distribute items evenly */
+    align-items: center;
+    gap: 10px;
+    /* width: 100%; */
+    box-sizing: border-box;
 }
 
+.selector-div > * {
+    flex: 1;  /* Flex grow to take equal space */
+    min-width: 150px;  /* Minimum width to prevent items from becoming too small */
+}
+
+.date-picker-item {
+    width: 15%;
+}

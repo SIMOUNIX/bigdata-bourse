@@ -19,6 +19,7 @@ from utils import (
     get_start_end_dates_for_selected_companies,
     build_raw_data_content,
     build_dashboard_overview,
+    build_sp500_ytd_content
 )
 
 external_stylesheets = [
@@ -69,6 +70,12 @@ app.layout = html.Div(
                             n_clicks=0,
                             className="btn btn-width",
                         ),
+                        html.Button(
+                            "YTD",
+                            id="btn-sp500-ytd",
+                            n_clicks=0,
+                            className="btn btn-width",
+                        ),
                     ],
                     id="menu",
                     className="navbar",
@@ -81,7 +88,7 @@ app.layout = html.Div(
     className="layout-container",
 )
 
-# Callback to update page content and active button
+# callback to update page content and active button
 @app.callback(
     [Output("page-content", "children"), Output("menu", "children")],
     [
@@ -89,42 +96,30 @@ app.layout = html.Div(
         Input("btn-share-price", "n_clicks"),
         Input("btn-bollinger-bands", "n_clicks"),
         Input("btn-raw-data", "n_clicks"),
+        Input("btn-sp500-ytd", "n_clicks"),
     ],
     [
         State("btn-dashboard", "id"),
         State("btn-share-price", "id"),
         State("btn-bollinger-bands", "id"),
         State("btn-raw-data", "id"),
+        State("btn-sp500-ytd", "id"),
     ],
 )
-def update_page_content(
-    btn_home,
-    btn_share_price,
-    btn_bollinger_bands,
-    btn_raw_data,
-    id_home,
-    id_share_price,
-    id_bollinger_bands,
-    id_raw_data,
-):
+def update_page_content(btn_home, btn_share_price, btn_bollinger_bands, btn_raw_data, btn_sp500_ytd, id_home, id_share_price, id_bollinger_bands, id_raw_data, id_sp500_ytd):
     ctx = dash.callback_context
     if not ctx.triggered:
         button_id = "btn-dashboard"
     else:
         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-    content, active_button_id = get_page_content(
-        button_id, id_home, id_share_price, id_bollinger_bands, id_raw_data
-    )
+    content, active_button_id = get_page_content(button_id, id_home, id_share_price, id_bollinger_bands, id_raw_data, id_sp500_ytd)
 
     menu_buttons = generate_menu_buttons(active_button_id)
 
     return content, menu_buttons
 
-
-def get_page_content(
-    button_id, id_home, id_share_price, id_bollinger_bands, id_raw_data
-):
+def get_page_content(button_id, id_home, id_share_price, id_bollinger_bands, id_raw_data, id_sp500_ytd):
     if button_id == "btn-dashboard":
         content = build_dashboard_overview()
         active_button_id = id_home
@@ -137,6 +132,9 @@ def get_page_content(
     elif button_id == "btn-raw-data":
         content = build_raw_data_content()
         active_button_id = id_raw_data
+    elif button_id == "btn-sp500-ytd":
+        content = build_sp500_ytd_content()
+        active_button_id = id_sp500_ytd
     else:
         content = "Select an option from the menu"
         active_button_id = "btn-dashboard"
@@ -295,8 +293,9 @@ def update_candlestick_date_range(companies_ids, old_debug_info):
     Input("company-selector-candlestick", "value"),
     Input("date-picker-candlestick", "start_date"),
     Input("date-picker-candlestick", "end_date"),
+    Input("graph-type-selector", "value"),
 )
-def update_candlestick_graph(companies_ids, start_date, end_date):
+def update_candlestick_graph(companies_ids, start_date, end_date, graph_type):
     companies_list = list(companies_ids)
 
     if not companies_list:
@@ -315,16 +314,27 @@ def update_candlestick_graph(companies_ids, start_date, end_date):
     fig = go.Figure()
     for company_id in companies_list:
         company_df = df[df["cid"] == company_id]
-        fig.add_trace(go.Candlestick(
-            x=company_df["date"],
-            open=company_df["open"],
-            high=company_df["high"],
-            low=company_df["low"],
-            close=company_df["close"],
-            name=get_company_name(company_id),
-            increasing_line_color=company_df["color"].iloc[0],
-            decreasing_line_color=lighten_color(company_df["color"].iloc[0]),
-        ))
+        
+        if graph_type == 'candlestick':
+            fig.add_trace(go.Candlestick(
+                x=company_df["date"],
+                open=company_df["open"],
+                high=company_df["high"],
+                low=company_df["low"],
+                close=company_df["close"],
+                name=get_company_name(company_id),
+                increasing_line_color=company_df["color"].iloc[0],
+                decreasing_line_color=lighten_color(company_df["color"].iloc[0]),
+            ))
+        elif graph_type == 'line':
+            fig.add_trace(go.Scatter(
+                x=company_df["date"],
+                y=company_df["close"],
+                mode="lines",
+                name=get_company_name(company_id),
+                line=dict(color=company_df["color"].iloc[0]),
+            ))
+            
         
     fig.update_layout(
         title="Candlestick Chart",
@@ -358,6 +368,8 @@ def lighten_color(color, factor=0.5):
     return lightened_color
 
 # ------------------ End Candlestick Chart ----------------
+
+# ------------------ Raw Data -----------------------------
 
 @app.callback(
     Output("company-selector-raw-data", "options"),
@@ -416,8 +428,90 @@ def update_raw_data_table(companies_ids, start_date, end_date):
     
     return df.to_dict("records")
 
-# ------------------ Raw Data -----------------------------
+# ------------------ End Raw Data -------------------------
 
+# ------------------ SP500 & YTD --------------------------
+
+@app.callback(
+    Output("company-selector-sp500-ytd", "options"),
+    Output("company-selector-sp500-ytd", "value"),
+    Input("market-selector-sp500-ytd", "value"),
+)
+def update_sp500_ytd_companies(market_id):
+    companies = get_companies(market_id)
+    companies_options = create_companies_options(companies)
+    
+    # set default value to the first company
+    default_company = companies_options[0]["value"]
+    
+    return companies_options, default_company
+
+@app.callback(
+    Output("sp500-ytd-graph", "figure"),
+    Output("sp500-ytd-debug", "children"),
+    Input("company-selector-sp500-ytd", "value"),
+    State("sp500-ytd-debug", "children"),
+)
+def update_sp500_ytd_graph(company_id, old_debug_info):
+    df = get_daystocks(company_id, None, None)
+    # order by date
+    df = df.sort_values("date")
+    
+    # compute the YTD value for each year
+    df["year"] = df["date"].dt.strftime("%Y")
+    df["ytd"] = (df["close"] - df.groupby("year")["close"].transform("first")) / df.groupby("year")["close"].transform("first") * 100
+    
+    fig = go.Figure()
+
+    # determine the color based on the latest YTD value
+    latest_ytd = df["ytd"].iloc[-1]
+    line_color = "green" if latest_ytd >= 0 else "red"
+    # above is not working
+
+    fig.add_trace(go.Scatter(
+        x=df["date"], 
+        y=df["ytd"], 
+        mode="lines", 
+        name="YTD",
+        line=dict(color=line_color)
+    ))
+    
+    # add a horizontal line at y=0
+    fig.add_shape(
+        type="line",
+        x0=df["date"].min(),
+        y0=0,
+        x1=df["date"].max(),
+        y1=0,
+        line=dict(color="black", width=1, dash="dash")
+    )
+
+    company_name = get_company_name(company_id)
+    
+    fig.update_layout(
+        title=f"YTD for {company_name}",
+        xaxis_title="Date",
+        yaxis_title="YTD (%)",
+        plot_bgcolor="white",
+        font=dict(family="Arial", size=12),
+        margin=dict(l=50, r=50, t=80, b=50),
+        hovermode="x",
+        showlegend=True,
+        legend=dict(
+            font=dict(family="Arial", size=10),
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+        ),
+        xaxis=dict(gridcolor="lightgrey"),
+        yaxis=dict(gridcolor="lightgrey"),
+    )
+
+    new_debug_info = old_debug_info + [html.Div(f"Company {company_id} selected")]
+    
+    return fig, new_debug_info    
 
 if __name__ == "__main__":
     app.run_server(debug=True, port=8050)
