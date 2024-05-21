@@ -46,6 +46,26 @@ def create_markets_options(markets_df):
     
     return markets_options
 
+def get_market_name(mid):
+    """function to get the name of a market
+
+    Args:
+        mid (int): market id
+
+    Returns:
+        str: market name
+    """
+    if mid == 7:
+        return "Paris compartiment A"
+    elif mid == 8:
+        return "Paris compartiment B"
+    elif mid == 1:
+        return "Euronext"
+    elif mid == 6:
+        return "Amsterdam"
+    else:
+        return "Unknown" # should not happen
+
 
 def get_companies(mid):
     """function to get all companies from a market
@@ -91,6 +111,19 @@ def get_company_name(cid):
     query = f"SELECT name FROM companies WHERE id = '{cid}'"
     df = pd.read_sql(query, engine)
     return df["name"].values[0]
+
+def get_company_symbol(cid):
+    """function to get the symbol of a company
+
+    Args:
+        cid (int): company id
+
+    Returns:
+        str: company symbol
+    """
+    query = f"SELECT symbol FROM companies WHERE id = '{cid}'"
+    df = pd.read_sql(query, engine)
+    return df["symbol"].values[0]
 
 def get_daystocks(cid, start_date, end_date):
     """
@@ -189,13 +222,13 @@ def generate_menu_buttons(active_button_id):
             "Overview", id="btn-dashboard", n_clicks=0, className="btn btn-width"
         ),
         html.Button(
-            "Share Price", id="btn-share-price", n_clicks=0, className="btn btn-width"
+            "Cours de l'action", id="btn-share-price", n_clicks=0, className="btn btn-width"
         ),
         html.Button(
-            "Bollinger Bands", id="btn-bollinger-bands", n_clicks=0, className="btn btn-width",
+            "Bandes de Bollinger", id="btn-bollinger-bands", n_clicks=0, className="btn btn-width",
         ),
         html.Button(
-            "Raw Data", id="btn-raw-data", n_clicks=0, className="btn btn-width"
+            "Données brutes", id="btn-raw-data", n_clicks=0, className="btn btn-width"
         ),
         html.Button(
             "YTD", id="btn-sp500-ytd", n_clicks=0, className="btn btn-width"
@@ -265,7 +298,7 @@ def build_bollinger_content():
             selector_div,
             dcc.Graph(id="bollinger-graph", className="main-content-children"),
             html.Div(id="bollinger-debug",
-                     className="main-content-children",
+                     className="debug-div",
                      children=["Debug info"]),
         ]
     )
@@ -339,7 +372,7 @@ def build_candlestick_content():
         [
             selector_div,
             dcc.Graph(id="candlestick-graph", className="main-content-children"),
-            html.Div(id="candlestick-debug", className="main-content-children", children=["Debug info"]),
+            html.Div(id="candlestick-debug", className="debug-div", children=["Debug info"]),
         ]
     )
 
@@ -411,7 +444,7 @@ def build_raw_data_content():
                                            sort_mode="multi",)],
                      className="main-content-children"),
             html.Div(id="raw-data-debug",
-                        className="main-content-children",
+                        className="debug-div",
                         children=["Debug info"]),
         ]
     )
@@ -492,6 +525,47 @@ def build_sp500_ytd_content():
         [
             selector_div,
             dcc.Graph(id="sp500-ytd-graph", className="main-content-children"),
-            html.Div(id="sp500-ytd-debug", className="main-content-children", children=["Debug info"]),
+            html.Div(id="sp500-ytd-debug", className="debug-div", children=["Debug info"]),
         ]
     )
+    
+    
+def build_information(market_id, companies_id, title, explanation):
+    """function to build the information of the page
+
+    Args:
+        market_id (int): market id
+        companies_id (list[int]): list of companies id
+        title (str): title of the information
+        explanation (str): explanation of the information
+
+    Returns:
+        html.Div: the information of the page
+    """
+    
+    info_div = html.Div([
+        html.H5(title),
+        html.P(explanation)],
+        className="main-content-children"
+    )
+    
+    if type(companies_id) == int:
+        companies_id = [companies_id]
+        
+    companies_symbol = [get_company_symbol(cid) for cid in companies_id]
+    companies_name = [get_company_name(cid) for cid in companies_id]
+    
+    companies_name_and_symbol = [f"{name} ({symbol})" for name, symbol in zip(companies_name, companies_symbol)]
+    
+    etr = "Entreprise" if len(companies_id) == 1 else "Entreprises"
+    
+    market_and_companies_div = html.Div([
+        html.P(f"Marché : {get_market_name(market_id)}"),
+        html.P(f"{etr} : {', '.join(companies_name_and_symbol)}")],
+        className="main-content-children"
+    )
+    
+    return html.Div([
+        info_div,
+        market_and_companies_div],
+        className="information-wrapper")
