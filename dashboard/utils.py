@@ -151,8 +151,11 @@ def get_multiple_daystocks(cids, start_date, end_date):
     
     cids_str = ','.join(str(cid) for cid in cids)
     
-    # select all daystocks from the selected companies between the start and end dates
-    query = f"SELECT * FROM daystocks WHERE cid IN ({cids_str}) AND date >= '{start_date}' AND date <= '{end_date}'"
+    if start_date is None or end_date is None:
+        query = f"SELECT * FROM daystocks WHERE cid IN ({cids_str})"
+    else:
+        # select all daystocks from the selected companies between the start and end dates
+        query = f"SELECT * FROM daystocks WHERE cid IN ({cids_str}) AND date >= '{start_date}' AND date <= '{end_date}'"
     df = pd.read_sql(query, engine)
     return df
 

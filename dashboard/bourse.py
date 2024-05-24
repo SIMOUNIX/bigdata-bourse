@@ -301,6 +301,16 @@ def update_candlestick_graph(companies_ids, start_date, end_date, graph_type, ma
 
     df = get_multiple_daystocks(companies_list, start_date, end_date)
     
+    # check if df is empty
+    if df.empty:
+        text = get_company_name(companies_list[0]) if len(companies_list) == 1 else "les sociétés sélectionnées"
+        return {}, build_information(market_id, companies_list, "Cours de l'action", f"Il n'y a pas de données pour {text}.")
+    
+    # if not empty, clear the companies in df that have no data
+    companies_with_data = df["cid"].unique()
+    companies_list = [cid for cid in companies_list if cid in companies_with_data]
+    df = df[df["cid"].isin(companies_list)]
+    
     # order by date
     df = df.sort_values("date")
     
@@ -413,6 +423,15 @@ def update_raw_data_table(companies_ids, start_date, end_date, market_id):
         return [], ""
 
     df = get_multiple_daystocks(companies_list, start_date, end_date)
+    
+    if df.empty:
+        text = get_company_name(companies_list[0]) if len(companies_list) == 1 else "les sociétés sélectionnées"
+        return [], build_information(market_id, companies_list, "Données brutes", f"Il n'y a pas de données pour {text}.")
+    
+    # clean the companies in df that have no data
+    companies_with_data = df["cid"].unique()
+    companies_list = [cid for cid in companies_list if cid in companies_with_data]
+    df = df[df["cid"].isin(companies_list)]
     
     # format the date column: yyyy/mm/dd   
     df["date"] = df["date"].dt.strftime("%Y/%m/%d")
