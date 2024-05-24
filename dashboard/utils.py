@@ -257,7 +257,7 @@ def build_bollinger_content():
     market_selector = dcc.Dropdown(
         id="market-selector-bollinger",
         options=markets_options,
-        value=markets_options[0]["value"],
+        value=markets_options[3]["value"],
         style={"width": "100%"},
         placeholder="Séléctionner un marché",
         clearable=False,
@@ -320,7 +320,7 @@ def build_candlestick_content():
     market_selector = dcc.Dropdown(
         id="market-selector-candlestick",
         options=markets_options,
-        value=markets_options[0]["value"],
+        value=markets_options[3]["value"],
         clearable=False,
         multi=False,
         className="selector-item"
@@ -347,8 +347,8 @@ def build_candlestick_content():
     graph_type_selector = dcc.Dropdown(
         id="graph-type-selector",
         options=[
-            {"label": "Candlestick", "value": "candlestick"},
-            {"label": "Line", "value": "line"},
+            {"label": "Chandelier", "value": "candlestick"},
+            {"label": "Ligne", "value": "line"},
         ],
         value="candlestick",
         clearable=False,
@@ -394,7 +394,7 @@ def build_raw_data_content():
     market_selector = dcc.Dropdown(
         id="market-selector-raw-data",
         options=markets_options,
-        value=markets_options[0]["value"],
+        value=markets_options[3]["value"],
         style={"width": "100%"},
         clearable=False,
         multi=False
@@ -496,7 +496,7 @@ def build_sp500_ytd_content():
     market_selector = dcc.Dropdown(
         id="market-selector-sp500-ytd",
         options=markets_options,
-        value=markets_options[0]["value"],
+        value=markets_options[3]["value"],
         clearable=False,
         multi=False,
         className="selector-item"

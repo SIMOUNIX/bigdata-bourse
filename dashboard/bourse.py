@@ -206,8 +206,10 @@ def update_bollinger_graph(market_id, company_id, start_date, end_date):
     # add traces for Close Price, 20-day SMA, Upper Band, and Lower Band
     fig.add_trace(go.Scatter(x=df["date"], y=df["close"], mode="lines", name="Close Price"))
     fig.add_trace(go.Scatter(x=df["date"], y=df["20_sma"], mode="lines", name="20-day SMA"))
-    fig.add_trace(go.Scatter(x=df["date"], y=df["upper_band"], mode="lines", name="Upper Band"))
+    
+    # add lowerband and fill the area between upper and lower bands
     fig.add_trace(go.Scatter(x=df["date"], y=df["lower_band"], mode="lines", name="Lower Band"))
+    fig.add_trace(go.Scatter(x=df["date"], y=df["upper_band"], fill="tonexty", fillcolor="rgba(0,100,80,0.2)", mode="lines", name="Upper Band"))
 
     # update title
     fig.update_layout(title_text=f"Bandes de Bollinger pour {get_company_name(company_id)}", title_x=0.5)
@@ -343,7 +345,8 @@ def update_candlestick_graph(companies_ids, start_date, end_date, graph_type, ma
                 line=dict(color=company_df["color"].iloc[0]),
             ))
 
-    fig.update_layout(title_text="Cours de l'action", title_x=0.5)
+    title = "Cours de l'action pour " + ", ".join([get_company_name(cid) for cid in companies_list])
+    fig.update_layout(title_text=title, title_x=0.5)
 
     fig.update_layout(
         xaxis_title="Date",
