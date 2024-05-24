@@ -299,7 +299,7 @@ def build_bollinger_content():
             dcc.Graph(id="bollinger-graph", className="main-content-children"),
             html.Div(id="bollinger-debug",
                      className="debug-div",
-                     children=["Debug info"]),
+                     children=["Loading..."]),
         ]
     )
 
@@ -372,7 +372,7 @@ def build_candlestick_content():
         [
             selector_div,
             dcc.Graph(id="candlestick-graph", className="main-content-children"),
-            html.Div(id="candlestick-debug", className="debug-div", children=["Debug info"]),
+            html.Div(id="candlestick-debug", className="debug-div", children=["Loading..."]),
         ]
     )
 
@@ -445,7 +445,7 @@ def build_raw_data_content():
                      className="main-content-children"),
             html.Div(id="raw-data-debug",
                         className="debug-div",
-                        children=["Debug info"]),
+                        children=["Loading..."]),
         ]
     )
     
@@ -525,7 +525,7 @@ def build_sp500_ytd_content():
         [
             selector_div,
             dcc.Graph(id="sp500-ytd-graph", className="main-content-children"),
-            html.Div(id="sp500-ytd-debug", className="debug-div", children=["Debug info"]),
+            html.Div(id="sp500-ytd-debug", className="debug-div", children=["Loading..."]),
         ]
     )
     
