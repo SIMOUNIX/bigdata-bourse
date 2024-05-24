@@ -161,31 +161,9 @@ def feed_stocks_byday(path_df, mid, cids):
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"feed_stocks: Execution time: {elapsed_time:.6f} seconds")
-
-
-def filter_seen_paths(dfs):
-    # remove the files from file_done
-    seen_files = db.df_query('SELECT * FROM file_done')
-    seen_files = [file for file in seen_files]
-    seen_files = pd.concat(seen_files)
-    seen_files = set(seen_files['name'])
-    for i in range(4):
-        dfs[i] = dfs[i][~dfs[i]['path'].isin(seen_files)]
-    return dfs
-
-if __name__ == '__main__':
-    print("Start")
-    start_time = time.time()
     
-    # UNCOMMENT THE FOLLOWING LINES TO FEED THE DATABASES
-    db.clean_all_tables()
-
+def feed_database():
     df_compA, df_compB, df_amsterdam, df_peapme = create_path_df()
-    
-    # # removes files that have already been processed
-    # df_compA, df_compB, df_amsterdam, df_peapme = filter_seen_paths([
-    #     df_compA, df_compB, df_amsterdam, df_peapme
-    # ])
         
     feed_companies(df_compA, 7)
     feed_companies(df_compB, 8)
@@ -203,14 +181,14 @@ if __name__ == '__main__':
     feed_stocks_byday(df_amsterdam, 6, cids[6])
     feed_stocks_byday(df_peapme, 1, cids[1])
 
-    # feed_daystocks()
+if __name__ == '__main__':
+    print("Start")
+    start_time = time.time()
+    
+    #db.clean_all_tables()
+    #feed_database()
     
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Execution time: {elapsed_time:.6f} seconds")
-
-            
-    # print("---- LOGS ----")
-    # with open("/tmp/bourse.log", "r") as file:
-    #     print(file.read())
     print("Done")
