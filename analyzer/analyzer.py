@@ -72,6 +72,7 @@ def clean_df(df):
     df['last'] = df['last'].astype(float)
     # converting the volume to int
     df['volume'] = df['volume'].astype(int)
+    df = df[df['volume'] != 0]
     return df
 
 def feed_companies(path_df, mid):
@@ -119,67 +120,57 @@ def feed_companies(path_df, mid):
     elapsed_time = end_time - start_time
     print(f"feed companies: Execution time: {elapsed_time:.6f} seconds")
     
+# helper function that will load the data from the pickle file for a whole day and return a dataframe
+def load_daystock(path_df, date):
+    path_df = path_df[path_df.index.date == date.date()]
+    dfs = []
+    for _, file in path_df.iterrows():
+        df = clean_df(pd.read_pickle(file['path']))
+        dfs.append(df)
+    return pd.concat(dfs)
     
-def feed_stocks(path_df, mid):
+def feed_stocks_byday(path_df, mid, cids):
     start_time = time.time()
     print(f"feed stocks for market {mid} starting...")
     
-    for date, file in path_df.iterrows(): # date is the index of the dataframe
-        # getting the companies ids and symbols
-        cids = db.df_query(f"SELECT id, symbol FROM companies WHERE mid = {mid}") 
-        cids = [cid for cid in cids]
-        cids = pd.concat(cids) # index: id - columns: symbol
+    daypath_df = path_df.resample('D').last().dropna()
+    for date in daypath_df.index:
+        df = load_daystock(path_df, date)
+        if df.empty:
+            continue
         
-        # cleaning and formatting the stocks dataframe
-        df = clean_df(pd.read_pickle(file[0])) # index: symbol - columns: last, volume
-        
-        # merging the company ids with their stock values by symbol (if the symbol is the same than we merge the rows)
         merged_df = pd.merge(cids, df, left_on='symbol', right_index=True, how='inner')
-        merged_df = merged_df.rename(columns={'id': 'cid', 'last': 'value'}) # renaming the columns
-        merged_df['date'] = date # adding the date column
-        merged_df = merged_df[['date', 'cid', 'value', 'volume']] # reordering columns
+        merged_df = merged_df.rename(columns={'id': 'cid', 'last': 'value'})
+        merged_df['date'] = date
+        merged_df = merged_df[['date', 'cid', 'value', 'volume']]
+        
+        daystocks_df = merged_df.groupby('cid').agg(
+            open=('value', 'first'),
+            close=('value', 'last'),
+            high=('value', 'max'),
+            low=('value', 'min'),
+            volume=('volume', 'max')
+        ).reset_index()
+        daystocks_df['date'] = date
+        daystocks_df = daystocks_df[['date', 'cid', 'open', 'close', 'high', 'low', 'volume']]
         
         db.df_write_optimized(merged_df, table="stocks")
+        db.df_write_optimized(daystocks_df, table="daystocks")
         db.commit()
-        db.execute('''INSERT INTO file_done VALUES (%s)''', (file[0],))
-        db.commit()
-        
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"feed_stocks: Execution time: {elapsed_time:.6f} seconds")
-        
-def feed_daystocks():
-    start_time = time.time()
-    print("feed daystocks starting...")
-    # filling the daystocks table with the data from the stocks table
-    db.execute('''
-        INSERT INTO DAYSTOCKS (date, cid, open, close, high, low, volume)
-        SELECT
-            date::date AS date,
-            cid,
-            (SELECT value FROM STOCKS s1 WHERE s1.date = MIN(s.date) AND s1.cid = s.cid) AS open,
-            (SELECT value FROM STOCKS s2 WHERE s2.date = MAX(s.date) AND s2.cid = s.cid) AS close,
-            MAX(value) AS high,
-            MIN(value) AS low,
-            MAX(volume) AS volume
-        FROM STOCKS s
-        GROUP BY date::date, cid;        ;
-        ''')
-    db.commit()
     
     end_time = time.time()
     elapsed_time = end_time - start_time
-    print(f"feed_daystocks: Execution time: {elapsed_time:.6f} seconds")
+    print(f"feed_stocks: Execution time: {elapsed_time:.6f} seconds")
+
 
 def filter_seen_paths(dfs):
     # remove the files from file_done
     seen_files = db.df_query('SELECT * FROM file_done')
     seen_files = [file for file in seen_files]
-    seen_files = seen_files[0] # columns: name
+    seen_files = pd.concat(seen_files)
     seen_files = set(seen_files['name'])
-    
-    for df in dfs:
-        df = df[~df['path'].isin(seen_files)]
+    for i in range(4):
+        dfs[i] = dfs[i][~dfs[i]['path'].isin(seen_files)]
     return dfs
 
 if __name__ == '__main__':
@@ -192,21 +183,27 @@ if __name__ == '__main__':
     df_compA, df_compB, df_amsterdam, df_peapme = create_path_df()
     
     # # removes files that have already been processed
-    df_compA, df_compB, df_amsterdam, df_peapme = filter_seen_paths([
-        df_compA, df_compB, df_amsterdam, df_peapme
-    ])
-    
+    # df_compA, df_compB, df_amsterdam, df_peapme = filter_seen_paths([
+    #     df_compA, df_compB, df_amsterdam, df_peapme
+    # ])
+        
     feed_companies(df_compA, 7)
     feed_companies(df_compB, 8)
     feed_companies(df_amsterdam, 6)
     feed_companies(df_peapme, 1)
     
-    feed_stocks(df_compA, 7)
-    feed_stocks(df_compB, 8)
-    feed_stocks(df_amsterdam, 6)
-    feed_stocks(df_peapme, 1)
+    cids = {}
+    for mid in [7, 8, 6, 1]:
+        cids[mid] = db.df_query(f"SELECT id, symbol FROM companies WHERE mid = {mid}")
+        cids[mid] = [cid for cid in cids[mid]]
+        cids[mid] = pd.concat(cids[mid])
+    
+    feed_stocks_byday(df_compA, 7, cids[7])
+    feed_stocks_byday(df_compB, 8, cids[8])
+    feed_stocks_byday(df_amsterdam, 6, cids[6])
+    feed_stocks_byday(df_peapme, 1, cids[1])
 
-    feed_daystocks()
+    # feed_daystocks()
     
     end_time = time.time()
     elapsed_time = end_time - start_time
