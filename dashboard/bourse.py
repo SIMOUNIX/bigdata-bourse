@@ -19,7 +19,8 @@ from utils import (
     get_start_end_dates_for_selected_companies,
     build_raw_data_content,
     build_dashboard_overview,
-    build_sp500_ytd_content
+    build_sp500_ytd_content,
+    build_information
 )
 
 external_stylesheets = [
@@ -53,19 +54,19 @@ app.layout = html.Div(
                             className="btn btn-width",
                         ),
                         html.Button(
-                            "Share Price",
+                            "Cours de l'action",
                             id="btn-share-price",
                             n_clicks=0,
                             className="btn btn-width",
                         ),
                         html.Button(
-                            "Bollinger Bands",
+                            "Bandes de Bollinger",
                             id="btn-bollinger-bands",
                             n_clicks=0,
                             className="btn btn-width",
                         ),
                         html.Button(
-                            "Raw Data",
+                            "Données brutes",
                             id="btn-raw-data",
                             n_clicks=0,
                             className="btn btn-width",
@@ -160,22 +161,16 @@ def run_query(n_clicks, query):
 @app.callback(
     Output("company-selector-bollinger", "options"),
     Output("company-selector-bollinger", "value"),
-    Output("bollinger-debug", "children"),
     Input("market-selector-bollinger", "value"),
-    State("bollinger-debug", "children")
 )
-def update_bollinger_companies(market_id, old_debug_info):
+def update_bollinger_companies(market_id):
     companies = get_companies(market_id)
     companies_options = create_companies_options(companies)
     
     # set default value to the first company
     default_company = companies_options[0]["value"]
     
-    # update debug info
-    debug_message = f"Market {market_id} selected"
-    debug_info = old_debug_info + [html.Div(debug_message)]
-    
-    return companies_options, default_company, debug_info
+    return companies_options, default_company
 
 @app.callback(
     Output("date-picker-bollinger", "start_date"),
@@ -188,11 +183,13 @@ def update_bollinger_date_range(company_id):
 
 @app.callback(
     Output("bollinger-graph", "figure"),
+    Output("bollinger-debug", "children"),
+    Input("market-selector-bollinger", "value"),
     Input("company-selector-bollinger", "value"),
     Input("date-picker-bollinger", "start_date"),
     Input("date-picker-bollinger", "end_date"),
 )
-def update_bollinger_graph(company_id, start_date, end_date):
+def update_bollinger_graph(market_id, company_id, start_date, end_date):
     df = get_daystocks(company_id, start_date, end_date)
     
     # order by date
@@ -209,16 +206,18 @@ def update_bollinger_graph(company_id, start_date, end_date):
     # add traces for Close Price, 20-day SMA, Upper Band, and Lower Band
     fig.add_trace(go.Scatter(x=df["date"], y=df["close"], mode="lines", name="Close Price"))
     fig.add_trace(go.Scatter(x=df["date"], y=df["20_sma"], mode="lines", name="20-day SMA"))
-    fig.add_trace(go.Scatter(x=df["date"], y=df["upper_band"], mode="lines", name="Upper Band"))
+    
+    # add lowerband and fill the area between upper and lower bands
     fig.add_trace(go.Scatter(x=df["date"], y=df["lower_band"], mode="lines", name="Lower Band"))
+    fig.add_trace(go.Scatter(x=df["date"], y=df["upper_band"], fill="tonexty", fillcolor="rgba(0,100,80,0.2)", mode="lines", name="Upper Band"))
 
     # update title
-    fig.update_layout(title_text=f"Bollinger Bands for {get_company_name(company_id)}", title_x=0.5)
+    fig.update_layout(title_text=f"Bandes de Bollinger pour {get_company_name(company_id)}", title_x=0.5)
 
     # update layout with axis titles, legend, etc.
     fig.update_layout(
         xaxis_title="Date",
-        yaxis_title="Price",
+        yaxis_title="Montant",
         plot_bgcolor="white",
         font=dict(family="Arial", size=12),
         margin=dict(l=50, r=50, t=80, b=50),
@@ -236,7 +235,7 @@ def update_bollinger_graph(company_id, start_date, end_date):
         yaxis=dict(gridcolor="lightgrey"),
     )
 
-    # Add range selector buttons for easy zooming
+    # add range selector buttons for easy zooming
     fig.update_layout(
         xaxis=dict(
             rangeselector=dict(
@@ -253,8 +252,11 @@ def update_bollinger_graph(company_id, start_date, end_date):
         )
     )
 
-    return fig
-    
+    explanation_bollinger_band = "Les bandes de Bollinger sont un indicateur technique qui mesure la volatilité d'un titre en traçant deux bandes autour d'une moyenne mobile. La distance entre les bandes est basée sur l'écart-type, qui est une mesure de la volatilité. Les bandes de Bollinger sont souvent utilisées pour identifier les conditions de surachat ou de survente dans un titre."
+    title = f"Bandes de Bollinger pour {get_company_name(company_id)}"
+
+    return fig, build_information(market_id, company_id, title, explanation_bollinger_band)
+
 # ------------------ End Bollinger Bands ------------------
 
 # ------------------ Candlestick Chart --------------------
@@ -276,32 +278,40 @@ def update_candlestick_companies(market_id):
 @app.callback(
     Output("date-picker-candlestick", "start_date"),
     Output("date-picker-candlestick", "end_date"),
-    Output("candlestick-debug", "children"),
     Input("company-selector-candlestick", "value"),
-    State("candlestick-debug", "children"),
 )
-def update_candlestick_date_range(companies_ids, old_debug_info):
+def update_candlestick_date_range(companies_ids):
     companies_list = list(companies_ids)
     
     start_date, end_date = get_start_end_dates_for_selected_companies(companies_list).values[0]
-    # add the selected companies to the debug info
-    debug_info = old_debug_info + [html.Div(f"Companies selected: {companies_list}")]
-    return start_date, end_date, debug_info
+    return start_date, end_date
 
 @app.callback(
     Output("candlestick-graph", "figure"),
+    Output("candlestick-debug", "children"),
     Input("company-selector-candlestick", "value"),
     Input("date-picker-candlestick", "start_date"),
     Input("date-picker-candlestick", "end_date"),
     Input("graph-type-selector", "value"),
+    Input("market-selector-candlestick", "value"),
 )
-def update_candlestick_graph(companies_ids, start_date, end_date, graph_type):
+def update_candlestick_graph(companies_ids, start_date, end_date, graph_type, market_id):
     companies_list = list(companies_ids)
 
     if not companies_list:
-        return {}    
+        return {}, ""
 
     df = get_multiple_daystocks(companies_list, start_date, end_date)
+    
+    # check if df is empty
+    if df.empty:
+        text = get_company_name(companies_list[0]) if len(companies_list) == 1 else "les sociétés sélectionnées"
+        return {}, build_information(market_id, companies_list, "Cours de l'action", f"Il n'y a pas de données pour {text}.")
+    
+    # if not empty, clear the companies in df that have no data
+    companies_with_data = df["cid"].unique()
+    companies_list = [cid for cid in companies_list if cid in companies_with_data]
+    df = df[df["cid"].isin(companies_list)]
     
     # order by date
     df = df.sort_values("date")
@@ -334,12 +344,13 @@ def update_candlestick_graph(companies_ids, start_date, end_date, graph_type):
                 name=get_company_name(company_id),
                 line=dict(color=company_df["color"].iloc[0]),
             ))
-            
-        
+
+    title = "Cours de l'action pour " + ", ".join([get_company_name(cid) for cid in companies_list])
+    fig.update_layout(title_text=title, title_x=0.5)
+
     fig.update_layout(
-        title="Candlestick Chart",
         xaxis_title="Date",
-        yaxis_title="Price",
+        yaxis_title="Montant",
         plot_bgcolor="white",
         font=dict(family="Arial", size=12),
         margin=dict(l=50, r=50, t=80, b=50),
@@ -357,7 +368,11 @@ def update_candlestick_graph(companies_ids, start_date, end_date, graph_type):
         yaxis=dict(gridcolor="lightgrey"),
     )
     
-    return fig
+    explanation_candlestick = "Un graphique en chandelier est un type de graphique financier utilisé pour décrire les mouvements de prix d'un titre, dérivé de l'analyse technique. Chaque barre représente une période de temps donnée, généralement un jour. Les chandeliers indiquent les prix d'ouverture, de clôture, les plus hauts et les plus bas pour la période."
+    title = "Cours de l'action"
+    
+    return fig, build_information(market_id, companies_list, title, explanation_candlestick)
+
 
 def lighten_color(color, factor=0.5):
     """Lighten the given color."""
@@ -388,31 +403,38 @@ def update_raw_data_companies(market_id):
 @app.callback(
     Output("date-picker-raw-data", "start_date"),
     Output("date-picker-raw-data", "end_date"),
-    Output("raw-data-debug", "children"),
     Input("company-selector-raw-data", "value"),
-    State("raw-data-debug", "children"),
 )
-def update_raw_data_date_range(companies_ids, old_debug_info):
+def update_raw_data_date_range(companies_ids):
     companies_list = list(companies_ids)
     
     start_date, end_date = get_start_end_dates_for_selected_companies(companies_list).values[0]
-    # add the selected companies to the debug info
-    debug_info = old_debug_info + [html.Div(f"Companies selected: {companies_list}")]
-    return start_date, end_date, debug_info
+    return start_date, end_date
 
 @app.callback(
     Output("raw-data-table", "data"),
+    Output("raw-data-debug", "children"),
     Input("company-selector-raw-data", "value"),
     Input("date-picker-raw-data", "start_date"),
     Input("date-picker-raw-data", "end_date"),
+    Input("market-selector-raw-data", "value"),
 )
-def update_raw_data_table(companies_ids, start_date, end_date):
+def update_raw_data_table(companies_ids, start_date, end_date, market_id):
     companies_list = list(companies_ids)
 
     if not companies_list:
-        return []    
+        return [], ""
 
     df = get_multiple_daystocks(companies_list, start_date, end_date)
+    
+    if df.empty:
+        text = get_company_name(companies_list[0]) if len(companies_list) == 1 else "les sociétés sélectionnées"
+        return [], build_information(market_id, companies_list, "Données brutes", f"Il n'y a pas de données pour {text}.")
+    
+    # clean the companies in df that have no data
+    companies_with_data = df["cid"].unique()
+    companies_list = [cid for cid in companies_list if cid in companies_with_data]
+    df = df[df["cid"].isin(companies_list)]
     
     # format the date column: yyyy/mm/dd   
     df["date"] = df["date"].dt.strftime("%Y/%m/%d")
@@ -425,8 +447,11 @@ def update_raw_data_table(companies_ids, start_date, end_date):
     
     # order by date
     df = df.sort_values("date")
-    
-    return df.to_dict("records")
+
+    explanation_raw_data = "Les données brutes représentent les informations non traitées sur les transactions boursières, y compris les prix d'ouverture, de clôture, les plus hauts et les plus bas, ainsi que le volume des transactions pour chaque journée de négociation."
+    title = "Données brutes"
+
+    return df.to_dict("records"), build_information(market_id, companies_list, title, explanation_raw_data)
 
 # ------------------ End Raw Data -------------------------
 
@@ -450,9 +475,9 @@ def update_sp500_ytd_companies(market_id):
     Output("sp500-ytd-graph", "figure"),
     Output("sp500-ytd-debug", "children"),
     Input("company-selector-sp500-ytd", "value"),
-    State("sp500-ytd-debug", "children"),
+    Input("market-selector-sp500-ytd", "value"),
 )
-def update_sp500_ytd_graph(company_id, old_debug_info):
+def update_sp500_ytd_graph(company_id, market_id):
     df = get_daystocks(company_id, None, None)
     # order by date
     df = df.sort_values("date")
@@ -466,7 +491,6 @@ def update_sp500_ytd_graph(company_id, old_debug_info):
     # determine the color based on the latest YTD value
     latest_ytd = df["ytd"].iloc[-1]
     line_color = "green" if latest_ytd >= 0 else "red"
-    # above is not working
 
     fig.add_trace(go.Scatter(
         x=df["date"], 
@@ -488,8 +512,9 @@ def update_sp500_ytd_graph(company_id, old_debug_info):
 
     company_name = get_company_name(company_id)
     
+    fig.update_layout(title_text=f"YTD pour {company_name}", title_x=0.5)
+    
     fig.update_layout(
-        title=f"YTD for {company_name}",
         xaxis_title="Date",
         yaxis_title="YTD (%)",
         plot_bgcolor="white",
@@ -509,9 +534,10 @@ def update_sp500_ytd_graph(company_id, old_debug_info):
         yaxis=dict(gridcolor="lightgrey"),
     )
 
-    new_debug_info = old_debug_info + [html.Div(f"Company {company_id} selected")]
+    explanation_sp500_ytd = "Le YTD (Year-to-Date) est un indicateur financier qui mesure la performance d'un titre depuis le début de l'année en cours jusqu'à la date actuelle. Il est calculé en prenant la différence entre le cours actuel et le cours de clôture du premier jour de l'année, puis en divisant le résultat par le cours de clôture du premier jour de l'année."
+    title = f"YTD pour {company_name}"
     
-    return fig, new_debug_info    
+    return fig, build_information(market_id, company_id, title, explanation_sp500_ytd)
 
 if __name__ == "__main__":
     app.run_server(debug=True, port=8050)
