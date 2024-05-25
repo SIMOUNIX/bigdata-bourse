@@ -18,7 +18,7 @@ from utils import (
     get_start_end_dates_for_company,
     get_start_end_dates_for_selected_companies,
     build_raw_data_content,
-    build_dashboard_overview,
+    # build_dashboard_overview,
     build_sp500_ytd_content,
     build_information
 )
@@ -47,12 +47,12 @@ app.layout = html.Div(
             [
                 html.Div(
                     [
-                        html.Button(
-                            "Overview",
-                            id="btn-dashboard",
-                            n_clicks=0,
-                            className="btn btn-width",
-                        ),
+                        # html.Button(
+                        #     "Overview",
+                        #     id="btn-dashboard",
+                        #     n_clicks=0,
+                        #     className="btn btn-width",
+                        # ),
                         html.Button(
                             "Cours de l'action",
                             id="btn-share-price",
@@ -93,38 +93,38 @@ app.layout = html.Div(
 @app.callback(
     [Output("page-content", "children"), Output("menu", "children")],
     [
-        Input("btn-dashboard", "n_clicks"),
+        # Input("btn-dashboard", "n_clicks"),
         Input("btn-share-price", "n_clicks"),
         Input("btn-bollinger-bands", "n_clicks"),
         Input("btn-raw-data", "n_clicks"),
         Input("btn-sp500-ytd", "n_clicks"),
     ],
     [
-        State("btn-dashboard", "id"),
+        # State("btn-dashboard", "id"),
         State("btn-share-price", "id"),
         State("btn-bollinger-bands", "id"),
         State("btn-raw-data", "id"),
         State("btn-sp500-ytd", "id"),
     ],
 )
-def update_page_content(btn_home, btn_share_price, btn_bollinger_bands, btn_raw_data, btn_sp500_ytd, id_home, id_share_price, id_bollinger_bands, id_raw_data, id_sp500_ytd):
+def update_page_content(btn_share_price, btn_bollinger_bands, btn_raw_data, btn_sp500_ytd, id_share_price, id_bollinger_bands, id_raw_data, id_sp500_ytd):
     ctx = dash.callback_context
     if not ctx.triggered:
-        button_id = "btn-dashboard"
+        button_id = "btn-share-price" # change to btn-dashboard if we want to show the dashboard by default
     else:
         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-    content, active_button_id = get_page_content(button_id, id_home, id_share_price, id_bollinger_bands, id_raw_data, id_sp500_ytd)
+    content, active_button_id = get_page_content(button_id, id_share_price, id_bollinger_bands, id_raw_data, id_sp500_ytd)
 
     menu_buttons = generate_menu_buttons(active_button_id)
 
     return content, menu_buttons
 
-def get_page_content(button_id, id_home, id_share_price, id_bollinger_bands, id_raw_data, id_sp500_ytd):
-    if button_id == "btn-dashboard":
-        content = build_dashboard_overview()
-        active_button_id = id_home
-    elif button_id == "btn-share-price":
+def get_page_content(button_id, id_share_price, id_bollinger_bands, id_raw_data, id_sp500_ytd):
+    # if button_id == "btn-dashboard":
+    #     content = build_dashboard_overview()
+    #     active_button_id = id_home
+    if button_id == "btn-share-price":
         content = build_candlestick_content()
         active_button_id = id_share_price
     elif button_id == "btn-bollinger-bands":
@@ -138,7 +138,7 @@ def get_page_content(button_id, id_home, id_share_price, id_bollinger_bands, id_
         active_button_id = id_sp500_ytd
     else:
         content = "Select an option from the menu"
-        active_button_id = "btn-dashboard"
+        active_button_id = "btn-share-price" # change to btn-dashboard if we want to show the dashboard by default
 
     return content, active_button_id
 
@@ -309,6 +309,7 @@ def update_candlestick_graph(companies_ids, start_date, end_date, graph_type, ma
         return {}, build_information(market_id, companies_list, "Cours de l'action", f"Il n'y a pas de données pour {text}.")
     
     # if not empty, clear the companies in df that have no data
+    copy_companies_list = companies_list.copy()
     companies_with_data = df["cid"].unique()
     companies_list = [cid for cid in companies_list if cid in companies_with_data]
     df = df[df["cid"].isin(companies_list)]
@@ -371,7 +372,7 @@ def update_candlestick_graph(companies_ids, start_date, end_date, graph_type, ma
     explanation_candlestick = "Un graphique en chandelier est un type de graphique financier utilisé pour décrire les mouvements de prix d'un titre, dérivé de l'analyse technique. Chaque barre représente une période de temps donnée, généralement un jour. Les chandeliers indiquent les prix d'ouverture, de clôture, les plus hauts et les plus bas pour la période."
     title = "Cours de l'action"
     
-    return fig, build_information(market_id, companies_list, title, explanation_candlestick)
+    return fig, build_information(market_id, copy_companies_list, title, explanation_candlestick)
 
 
 def lighten_color(color, factor=0.5):
@@ -432,6 +433,7 @@ def update_raw_data_table(companies_ids, start_date, end_date, market_id):
         return [], build_information(market_id, companies_list, "Données brutes", f"Il n'y a pas de données pour {text}.")
     
     # clean the companies in df that have no data
+    copy_companies_list = companies_list.copy()
     companies_with_data = df["cid"].unique()
     companies_list = [cid for cid in companies_list if cid in companies_with_data]
     df = df[df["cid"].isin(companies_list)]
@@ -451,7 +453,7 @@ def update_raw_data_table(companies_ids, start_date, end_date, market_id):
     explanation_raw_data = "Les données brutes représentent les informations non traitées sur les transactions boursières, y compris les prix d'ouverture, de clôture, les plus hauts et les plus bas, ainsi que le volume des transactions pour chaque journée de négociation."
     title = "Données brutes"
 
-    return df.to_dict("records"), build_information(market_id, companies_list, title, explanation_raw_data)
+    return df.to_dict("records"), build_information(market_id, copy_companies_list, title, explanation_raw_data)
 
 # ------------------ End Raw Data -------------------------
 

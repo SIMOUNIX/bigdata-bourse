@@ -221,9 +221,9 @@ def get_high_low_volume_for_every_year():
 
 def generate_menu_buttons(active_button_id):
     menu_buttons = [
-        html.Button(
-            "Overview", id="btn-dashboard", n_clicks=0, className="btn btn-width"
-        ),
+        # html.Button(
+        #     "Overview", id="btn-dashboard", n_clicks=0, className="btn btn-width"
+        # ),
         html.Button(
             "Cours de l'action", id="btn-share-price", n_clicks=0, className="btn btn-width"
         ),
