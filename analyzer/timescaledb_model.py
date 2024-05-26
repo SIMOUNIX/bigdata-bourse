@@ -236,6 +236,7 @@ class TimescaleStockMarketModel:
         else:
             return 0
 
+    # write a dataframe to the database using the optimized copy_from method    
     def df_write_optimized(self, df, table, commit=False):
         sio = StringIO()
         df.to_csv(sio, sep='\t', header=False, index=False)
@@ -250,19 +251,6 @@ class TimescaleStockMarketModel:
         Check if a file has already been included in the DB
         '''
         return self.raw_query("SELECT EXISTS ( SELECT 1 FROM file_done WHERE name = '%s' );" % name)
-    
-    # create a method that drop all tables and reset all indexes using execute
-    def clean_all_tables(self):
-        self.execute("DELETE FROM companies")
-        self.execute("DELETE FROM stocks")
-        self.execute("DELETE FROM daystocks")
-        self.execute("DELETE FROM file_done")
-        self.execute("DELETE FROM tags")
-        self.execute("DELETE FROM markets")
-        self.execute("ALTER SEQUENCE company_id_seq RESTART WITH 1")
-        self.execute("ALTER SEQUENCE market_id_seq RESTART WITH 1")
-        self.commit()
-
         
 
 

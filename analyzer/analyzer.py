@@ -1,7 +1,5 @@
 import dateutil.parser
 import pandas as pd
-import numpy as np
-import glob
 import os
 import dateutil
 import time
@@ -27,9 +25,6 @@ def process_file_path(file):
     return file, date
 
 def create_path_df():
-    start_time = time.time()
-    print("create_path_df starting...")
-
     # Create a dictionary to store paths for each category
     categories = {'compA': [], 'compB': [], 'amsterdam': [], 'peapme': []}
 
@@ -55,10 +50,6 @@ def create_path_df():
         for category, paths in categories.items()
     }
 
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"create_path_df: Execution time: {elapsed_time:.6f} seconds")
-
     return dfs['compA'], dfs['compB'], dfs['amsterdam'], dfs['peapme']
 
 # FEEDING THE DATABASES
@@ -76,10 +67,7 @@ def clean_df(df):
     return df
 
 def feed_companies(path_df, mid):
-    start_time = time.time()
-    print(f"feed companies for market {mid} starting...")
     pea = (mid == 1)
-    
     # Keep the last index of each day
     path_df = path_df.resample('D').last()
     # Drop the days with no data -> stock market closed
@@ -116,10 +104,6 @@ def feed_companies(path_df, mid):
     db.df_write_optimized(df_output, table="companies")
     db.commit()
     
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"feed companies: Execution time: {elapsed_time:.6f} seconds")
-    
 # helper function that will load the data from the pickle file for a whole day and return a dataframe
 def load_daystock(path_df, date):
     path_df = path_df[path_df.index.date == date.date()]
@@ -129,12 +113,9 @@ def load_daystock(path_df, date):
         dfs.append(df)
     return pd.concat(dfs)
     
-def feed_stocks_byday(path_df, mid, cids):
-    start_time = time.time()
-    print(f"feed stocks for market {mid} starting...")
-    
-    daypath_df = path_df.resample('D').last().dropna()
-    for date in daypath_df.index:
+def feed_stocks_byday(path_df, cids):
+    daypath_list = path_df.resample('D').last().dropna().index
+    for date in daypath_list:
         df = load_daystock(path_df, date)
         if df.empty:
             continue
@@ -158,10 +139,6 @@ def feed_stocks_byday(path_df, mid, cids):
         db.df_write_optimized(daystocks_df, table="daystocks")
         db.commit()
     
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"feed_stocks: Execution time: {elapsed_time:.6f} seconds")
-    
 def feed_database():
     df_compA, df_compB, df_amsterdam, df_peapme = create_path_df()
         
@@ -176,19 +153,11 @@ def feed_database():
         cids[mid] = [cid for cid in cids[mid]]
         cids[mid] = pd.concat(cids[mid])
     
-    feed_stocks_byday(df_compA, 7, cids[7])
-    feed_stocks_byday(df_compB, 8, cids[8])
-    feed_stocks_byday(df_amsterdam, 6, cids[6])
-    feed_stocks_byday(df_peapme, 1, cids[1])
+    feed_stocks_byday(df_compA, cids[7])
+    feed_stocks_byday(df_compB, cids[8])
+    feed_stocks_byday(df_amsterdam, cids[6])
+    feed_stocks_byday(df_peapme, cids[1])
 
 if __name__ == '__main__':
-    print("Start")
-    start_time = time.time()
-    
-    #db.clean_all_tables()
-    #feed_database()
-    
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"Execution time: {elapsed_time:.6f} seconds")
+    feed_database()
     print("Done")
