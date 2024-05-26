@@ -3,7 +3,6 @@
 # TimeScaleDB
 # pipenv install sqlalchemy-timescaledb
 
-import datetime
 import psycopg2
 import pandas as pd
 import sqlalchemy
