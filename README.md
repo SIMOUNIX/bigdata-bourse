@@ -3,8 +3,10 @@
 L'analyzer se décompose en plusieurs étapes:
 - recensement des fichiers pour chaque année et chaque marche
 - recensement des compagnies en omettant les compagnies qui apparaissent et disparaissent le même jour et insertion des valeurs dans la table correspondante
-- recensement des valeurs de stocks et insertion des valeurs dans la table correspondante après nettoyage
-- remplissage de la table daystocks à partir des valeurs de la table stocks 
+- recensement des valeurs de stocks, aggregation pour obtenir les valeurs de daystocks et insertion des valeurs dans la table correspondante après nettoyage
+
+Note :
+- la fonction d'écriture en database n'est la fonction originale mais une fonction utilisant la méthode copy_from qui est plus rapide.
 
 # Dashboard
 
@@ -24,4 +26,9 @@ Ensuite, le graphique correspondant s'affiche pour visualiser les données saisi
 
 Enfin, une section informative affiche les symboles des entreprises sélectionnées, même si elles n'ont aucune donnée, permettant à l'utilisateur de rechercher ces informations sur Internet en utilisant les symboles fournis.
 
-# Comment utiliser ?
+# Guide d'utilisation ?
+
+- modifier le docker-compose.yml pour mettre les bons paths
+- make dans le folder analyzer puis dans le folder dashboard
+- docker-compose up a la root du project (en cas de crash relancer docker-compose up)
+- attendre (environ 45min) que la database soit remplie puis consulter le dashboard au 127.0.0.1/8050
